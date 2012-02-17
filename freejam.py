@@ -5,6 +5,7 @@ import os
 
 import pyglet
 
+
 from pyglet import clock
 
 from pyglet.window import key
@@ -33,6 +34,19 @@ tra_img = pyglet.image.load('resources/image-textures/track_real_active.png')
 tla_img = pyglet.image.load('resources/image-textures/track_loop_active.png')
 toa_img = pyglet.image.load('resources/image-textures/track_other_active.png')
 tg_img = pyglet.image.load('resources/image-textures/track_generic.png')
+
+tbg_s_img = pyglet.image.load('resources/image-textures/track_software_bg.png')
+tbg_s_l_img = pyglet.image.load('resources/image-textures/track_software_bg_left.png')
+tbg_s_r_img = pyglet.image.load('resources/image-textures/track_software_bg_right.png')
+tbg_r_img = pyglet.image.load('resources/image-textures/track_real_bg.png')
+tbg_r_l_img = pyglet.image.load('resources/image-textures/track_real_bg_left.png')
+tbg_r_r_img = pyglet.image.load('resources/image-textures/track_real_bg_right.png')
+tbg_l_img = pyglet.image.load('resources/image-textures/track_loop_bg.png')
+tbg_l_l_img = pyglet.image.load('resources/image-textures/track_loop_bg_left.png')
+tbg_l_r_img = pyglet.image.load('resources/image-textures/track_loop_bg_right.png')
+tbg_o_img = pyglet.image.load('resources/image-textures/track_other_bg.png')
+tbg_o_l_img = pyglet.image.load('resources/image-textures/track_other_bg_left.png')
+tbg_o_r_img = pyglet.image.load('resources/image-textures/track_other_bg_right.png')
 
 trackbg_img = pyglet.image.load('resources/image-textures/trackbg.png')
 
@@ -78,7 +92,7 @@ global recording
 vbarloc = 100
 dragging_vbar = False
 STEP = 64 # maximum res is 64th-notes
-VIEW_SCALE = 1.0
+VIEW_SCALE = 10.0
 SCROLL = 0
 INDEX = 0
 PLAYBACK_SPEED = 16.0
@@ -100,25 +114,45 @@ pyglet.resource.reindex()
 def draw(*args):
 	#Dummy function to redraw the window
 	pass
+	
+def play_note(noteval, velocity):
+	player = pyglet.media.ManagedSoundPlayer()
+	player.queue(c)
+	player.pitch = note(noteval)
+	player.volume = velocity
+	player.play()
+	if recording:
+		ACTIVETRACK.tracks[-1].data[-1].append(noteval)
 
-#This label should be part of the track object.
-tracklabel1 = pyglet.text.Label('Piano',font_name='Times New Roman',font_size=10)
-tracklabel1_shadow = pyglet.text.Label('Piano',
-										font_name='Times New Roman',
-										font_size=10,
-										color=(0,0,0,255))
-def draw_track(num,width):
-	trackbg_img.blit(0,(vbarloc-barimg.height)-((num+1)*tsa_img.height),width=width)
+SIDE_WIDTH = 150
+def draw_track(track,num,width):
+	BASE_HEIGHT=(vbarloc-barimg.height)-((num+1)*track.img().height)
+	trackbg_img.blit(0,BASE_HEIGHT,width=width)
 	for i in xrange(*VIEW_EXTENTS):
 		if i%STEP==0:
-			rgb084084084.blit((i-SCROLL)*VIEW_SCALE+151,(vbarloc-barimg.height)-((num+1)*tsa_img.height)+4,height=tsa_img.height-4)
-	tsa_img.blit(0,(vbarloc-barimg.height)-((num+1)*tsa_img.height),width=150,height=tsa_img.height)
-	tracklabel1_shadow.x = 15
-	tracklabel1_shadow.y = (vbarloc-barimg.height)-(num*tsa_img.height+tracklabel1.font_size)-2
-	tracklabel1.x = 16
-	tracklabel1.y = (vbarloc-barimg.height)-(num*tsa_img.height+tracklabel1.font_size)-3
-	tracklabel1_shadow.draw()
-	tracklabel1.draw()
+			rgb084084084.blit((i-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+4,height=tsa_img.height-4)
+	track_index = 0
+	time_index = 0
+	for i in track.tracks:
+		if not i.is_silence():
+			pass
+			#print time_index
+			track.leftimg.blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+4)
+			track.cimg.blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+5,BASE_HEIGHT+4,width=len(i)*VIEW_SCALE-8)
+			track.rightimg.blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+len(i)*VIEW_SCALE-4,BASE_HEIGHT+4)
+			for j in xrange(len(i.data)):
+				if i.data[j]:
+					for k in i.data[j]:
+						rgb084084084.blit((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+8+k%28,width=10)
+		time_index+=len(i)
+		track_index+=1
+	track.img().blit(0,BASE_HEIGHT,width=SIDE_WIDTH,height=track.img().height)
+	track.labelshadow.x = 15
+	track.labelshadow.y = (vbarloc-barimg.height)-(num*track.img().height+track.label.font_size)-2
+	track.label.x = 16
+	track.label.y = (vbarloc-barimg.height)-(num*track.img().height+track.label.font_size)-3
+	track.labelshadow.draw()
+	track.label.draw()
 
 @window.event
 def on_draw():
@@ -224,7 +258,8 @@ def on_draw():
 	
 	#---------- Tracks ------------#
 	rgb184184184.blit(0,0,width=width,height=vbarloc-barimg.height)
-	draw_track(0,width)
+	for i in xrange(len(TRACKS)):
+		draw_track(TRACKS[i],i,width)
 	rgb084084084.blit(150,0,height=vbarloc-barimg.height)
 	rgb255000000.blit(151+(INDEX-SCROLL)*VIEW_SCALE,0,height=vbarloc-barimg.height)
 	#------------------------------#
@@ -259,6 +294,7 @@ def on_mouse_press(x, y, button, modifiers):
 				playing = True
 				#pyglet.clock.schedule_interval(play, 1/PLAYBACK_SPEED)
 			recording = True
+			ACTIVETRACK.add(subtrack())
 		return None
 	if cx<x<cx+rw_beg_img.width and ch<y<ch+rw_beg_img.height:
 		global INDEX
@@ -316,11 +352,7 @@ def on_mouse_drag(x, y, dx, dy, buttons, modifiers):
 		if not noteval in KEYPRESS_MASK:
 			KEYPRESS_MASK = []
 			KEYPRESS_MASK.append(noteval)
-			player = pyglet.media.ManagedSoundPlayer()
-			player.queue(c)
-			player.pitch = note(noteval)
-			player.volume = 127
-			player.play()
+			play_note(noteval,127)
 		return None
 	
 @window.event
@@ -336,11 +368,7 @@ def on_key_press(symbol, modifiers):
 		noteval = KEYMAP[symbol]
 		if not noteval in KEYPRESS_MASK:
 			KEYPRESS_MASK.append(noteval)
-		player = pyglet.media.ManagedSoundPlayer()
-		player.queue(c)
-		player.pitch = note(noteval)
-		player.volume = 127
-		player.play()
+		play_note(noteval,127)
 	
 @window.event
 def on_key_release(symbol,modifiers):
@@ -377,6 +405,8 @@ class silence(object):
 		self.n = n
 	def play(self,index):
 		return index==self.n-1
+	def is_silence(self):
+		return True
 		
 class track(object):
 	def __init__(self):
@@ -384,6 +414,14 @@ class track(object):
 		self.trackslen=[0]
 		self.tracksindex=0
 		self.playing=True
+		self.label = pyglet.text.Label('Piano',font_name='Times New Roman',font_size=10)
+		self.labelshadow = pyglet.text.Label('Piano', font_name='Times New Roman', font_size=10, color=(0,0,0,255))
+		self.int_img = tsa_img
+		self.cimg = tbg_s_img
+		self.leftimg = tbg_s_l_img
+		self.rightimg = tbg_s_r_img
+	def img(self):
+		return self.int_img if self==ACTIVETRACK else tg_img
 	def add(self,track):
 		self.tracks.append(track)
 		self.trackslen.append(len(track))
@@ -394,6 +432,9 @@ class track(object):
 				return i.play(INDEX-b)
 			else:
 				b+=len(i)
+	def set_text(self,text):
+		self.label.text = str(text)
+		self.labelshadow.text = str(text)
 
 		
 class subtrack(object):
@@ -406,9 +447,11 @@ class subtrack(object):
 			for i in self.data[index]:
 				player = pyglet.media.ManagedSoundPlayer()
 				player.queue(c)
-				player.pitch = i
+				player.pitch = note(i)
 				player.play()
 		return (index==len(self.data)-1)
+	def is_silence(self):
+		return False
 		
 		
 
@@ -424,11 +467,12 @@ track2 = subtrack()
 track2.data = [None,None,[1.498,2,2.52,2.996],None,None,None,[2,2.52,2.996]]
 
 TRACKS = [track(),track()]
-TRACKS[0].add(track1)
-TRACKS[0].add(silence(5))
-TRACKS[0].add(track1)
-TRACKS[0].add(track1)
-TRACKS[1].add(track2)
+ACTIVETRACK = TRACKS[0]
+#TRACKS[0].add(track1)
+#TRACKS[0].add(silence(5))
+#TRACKS[0].add(track1)
+#TRACKS[0].add(track1)
+#TRACKS[1].add(track2)
 
 TRACKSINDEX = [0]
 
@@ -440,6 +484,12 @@ def play(dt):
 			i.play(INDEX)
 		if INDEX<46:	#TODO: calculate this value
 			INDEX+=1
+		else:
+			global playing, recording
+			playing = False
+			recording = False
+	if recording:
+		ACTIVETRACK.tracks[-1].data.append([])
 
 
 class input(threading.Thread):
@@ -458,11 +508,7 @@ class input(threading.Thread):
 					if m.isNoteOn():
 						if not m.getNoteNumber() in KEYPRESS_MASK:
 							KEYPRESS_MASK.append(m.getNoteNumber())
-						player = pyglet.media.ManagedSoundPlayer()
-						player.queue(c)
-						player.pitch = note(m.getNoteNumber())
-						player.volume = (m.getVelocity()/128.0)**2
-						player.play()
+						play_note(m.getNoteNumber(),(m.getVelocity()/128.0)**2)
 						#window.dispatch_events()
 					elif m.isNoteOff():
 						if m.getNoteNumber() in KEYPRESS_MASK:
