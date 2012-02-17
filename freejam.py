@@ -195,6 +195,10 @@ def on_mouse_drag(x, y, dx, dy, buttons, modifiers):
 def on_mouse_release(x, y, button, modifiers):
 	global dragging_vbar
 	dragging_vbar = False
+	
+@window.event
+def on_close():
+	inp.stop = True
     
 pyglet.gl.glEnable(pyglet.gl.GL_BLEND)
 pyglet.gl.glBlendFunc(pyglet.gl.GL_SRC_ALPHA, pyglet.gl.GL_ONE_MINUS_SRC_ALPHA)
@@ -287,14 +291,15 @@ def play(dt):
 
 class input(threading.Thread):
 	def run(self):
+		self.stop = False
 		midiin = rtmidi.RtMidiIn()
 		ports = range(midiin.getPortCount())
 		if ports:
 			for i in ports:
-				print i, midiin.getPortName(i)
-			midiin.openPort(0)
-			while True:
-				m = midiin.getMessage(250) # some timeout in ms
+				print "Found port", i, midiin.getPortName(i)
+			midiin.openPort(int(raw_input("Enter MIDI port to use: ")))
+			while not self.stop:
+				m = midiin.getMessage(25) # some timeout in ms
 				if m != None:
 					#print dir(m)
 					if m.isNoteOn():
@@ -303,6 +308,7 @@ class input(threading.Thread):
 						player.pitch = note(m.getNoteNumber())
 						player.volume = (m.getVelocity()/128.0)**2
 						player.play()
+						window.dispatch_events()
 					elif m.isNoteOff():
 						pass
 			
