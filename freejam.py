@@ -28,6 +28,8 @@ pause_img = pyglet.image.load('resources/image-textures/pause.png')
 ff_img = pyglet.image.load('resources/image-textures/fastforward.png')
 ff_end_img = pyglet.image.load('resources/image-textures/forward_to_end.png')
 
+slider_img = pyglet.image.load('resources/image-textures/slider.png')
+
 
 tsa_img = pyglet.image.load('resources/image-textures/track_software_active.png')
 tra_img = pyglet.image.load('resources/image-textures/track_real_active.png')
@@ -51,6 +53,7 @@ tbg_o_r_img = pyglet.image.load('resources/image-textures/track_other_bg_right.p
 trackbg_img = pyglet.image.load('resources/image-textures/trackbg.png')
 
 # Colors for fills. OpenGL is overdrawing my stuff if I use primitives.
+rgb237237237= pyglet.image.load('resources/image-textures/colors/237-237-237.png')
 rgb184184184= pyglet.image.load('resources/image-textures/colors/184-184-184.png')
 rgb084084084= pyglet.image.load('resources/image-textures/colors/084-084-084.png')
 rgb255000000= pyglet.image.load('resources/image-textures/colors/255-000-000.png')
@@ -80,6 +83,7 @@ window.maximize()
 #### Global variables ######
 global vbarloc
 global dragging_vbar
+global dragging_scale
 global STEP
 global VIEW_SCALE
 global SCROLL 
@@ -91,8 +95,9 @@ global playing
 global recording
 vbarloc = 100
 dragging_vbar = False
+dragging_scale = False
 STEP = 64 # maximum res is 64th-notes
-VIEW_SCALE = 10.0
+VIEW_SCALE = 1.0
 SCROLL = 0
 INDEX = 0
 PLAYBACK_SPEED = 16.0
@@ -262,6 +267,9 @@ def on_draw():
 		draw_track(TRACKS[i],i,width)
 	rgb084084084.blit(150,0,height=vbarloc-barimg.height)
 	rgb255000000.blit(151+(INDEX-SCROLL)*VIEW_SCALE,0,height=vbarloc-barimg.height)
+	rgb237237237.blit(151,0,width=width-150,height=16)
+	rgb084084084.blit(155,8,width=width-159)
+	slider_img.blit(min(VIEW_SCALE*64+154,width-8),4)
 	#------------------------------#
 	
 	
@@ -330,6 +338,12 @@ def on_mouse_press(x, y, button, modifiers):
 	if cx<x<cx+ff_end_img.width and ch<y<ch+ff_end_img.height:
 		fast_forward_end()
 		return None
+	print VIEW_SCALE*64+150, x
+	if VIEW_SCALE*64+154<x<VIEW_SCALE*64+162 and 4<y<12:
+		global dragging_scale
+		dragging_scale = True
+		print 345
+		return None
 	if vbarloc-barimg.height<y<vbarloc:
 		global dragging_vbar
 		dragging_vbar = True
@@ -342,6 +356,9 @@ def on_mouse_drag(x, y, dx, dy, buttons, modifiers):
 	if dragging_vbar:
 		global vbarloc
 		vbarloc=max(min(vbarloc+dy,height),barimg.height)
+	elif dragging_scale:
+		global VIEW_SCALE
+		VIEW_SCALE = (x-154)/64.0
 	elif y>vbarloc and PLAYMODE=='keyboard':
 		global KEYPRESS_MASK
 		keyscale = max((height-vbarloc)/(key_cf_img.height*1.0),0.125)
@@ -361,6 +378,8 @@ def on_mouse_release(x, y, button, modifiers):
 	dragging_vbar = False
 	global KEYPRESS_MASK
 	KEYPRESS_MASK = []
+	global dragging_scale
+	dragging_scale = False
 	
 @window.event
 def on_key_press(symbol, modifiers):
