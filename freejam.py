@@ -97,6 +97,7 @@ global PLAYMODE
 global KEYPRESS_MASK
 global playing
 global recording
+global pitchbend
 vbarloc = 100
 dragging_vbar = False
 dragging_scale = False
@@ -113,6 +114,7 @@ KEYMAP = {key.A:36,key.W:37,key.S:38,key.E:39,key.D:40,key.F:41,key.T:42,
 			key.O:49,key.L:50,key.P:51,key.SEMICOLON:52,key.APOSTROPHE:53}
 playing = False
 recording = False
+pitchbend = 1.0
 ############################
 
 stagesprite = pyglet.sprite.Sprite(stageimg)
@@ -179,13 +181,21 @@ def draw(*args):
 	#Dummy function to redraw the window
 	pass
 	
-def cutoff_note(dt,note,cutoff):
-	print note.volume
-	if note.volume>0:
-		note.volume-=100.0/(20*cutoff)
-		pyglet.clock.schedule_once(cutoff_note,0.02,note,cutoff)
-	else:
-		note.stop()
+def cutoff_note(dt,notes,noteval,acnotes,cutoff):
+	#print note.volume
+	if not acnotes[noteval]:
+		if notes[noteval].volume>0:
+			notes[noteval].volume-=100.0/(20*cutoff)
+			pyglet.clock.schedule_once(cutoff_note,0.02,notes,noteval,acnotes,cutoff)
+		else:
+			notes[noteval].stop()
+			
+def fadein_note(dt,notes,noteval,acnotes,fadein,maxvol):
+	#print note.volume
+	if acnotes[noteval]:
+		if notes[noteval].volume<maxvol:
+			notes[noteval].volume+=100.0/(20*fadein)
+			pyglet.clock.schedule_once(fadein_note,0.02,notes,noteval,acnotes,fadein,maxvol)
 	
 def play_note(noteval, velocity):
 	player = pyglet.media.ManagedSoundPlayer()
@@ -340,6 +350,8 @@ def on_draw():
 	#------------------------------#
 	
 	
+	
+	
 @window.event
 def on_mouse_press(x, y, button, modifiers):
 	width, height = window.get_size()
@@ -435,6 +447,8 @@ def on_mouse_drag(x, y, dx, dy, buttons, modifiers):
 			if noteval%12 in (1,3,6,8,10):
 				noteval-=int(int((x+31)/(key_cf_img.width*keyscale)*12/7.0)+36==noteval)*2-1
 		if not noteval in KEYPRESS_MASK:
+			for i in KEYPRESS_MASK:
+				ACTIVETRACK.stop_note(i)
 			KEYPRESS_MASK = []
 			KEYPRESS_MASK.append(noteval)
 			ACTIVETRACK.play_note(noteval,1)
@@ -445,6 +459,8 @@ def on_mouse_release(x, y, button, modifiers):
 	global dragging_vbar
 	dragging_vbar = False
 	global KEYPRESS_MASK
+	for i in KEYPRESS_MASK:
+		ACTIVETRACK.stop_note(i)
 	KEYPRESS_MASK = []
 	global dragging_scale
 	dragging_scale = False
@@ -502,23 +518,44 @@ class track(object):
 		self.trackslen=[0]
 		self.tracksindex=0
 		self.playing=True
-		self.label = pyglet.text.Label('Piano',font_name='Times New Roman',font_size=10)
-		self.labelshadow = pyglet.text.Label('Piano', font_name='Times New Roman', font_size=10, color=(0,0,0,255))
-		self.definition = xml_to_dict(etree.parse('instruments/keyboards/piano1/instrument.xml').getroot())['instrument']
-		print self.definition['cutoff']
+		#self.definition = xml_to_dict(etree.parse('instruments/keyboards/piano1/instrument.xml').getroot())['instrument']
+		self.definition = xml_to_dict(etree.parse('instruments/strings/basic strings/instrument.xml').getroot())['instrument']
 		try:
 			self.cutoff = int(self.definition['cutoff'])
 		except:
-			print 'Cutoff not defined.'
 			self.cutoff = 100
+		try:
+			self.fadein = int(self.definition['fadein'])
+		except:
+			self.fadein = 0
+		try:
+			self.name = self.definition['name']
+		except:
+			self.name = 'Untitled instrument'
+		try:
+			self.continuous = True if self.definition['continuous'].lower()=='yes' else False
+		except:
+			self.continuous = False
+		try:
+			self.pitchbend = True if self.definition['pitchbend'].lower()=='yes' else False
+		except:
+			self.pitchbend = False
+		self.label = pyglet.text.Label(self.name,font_name='Times New Roman',font_size=10)
+		self.labelshadow = pyglet.text.Label(self.name, font_name='Times New Roman', font_size=10, color=(0,0,0,255))
 		self.int_img = tsa_img
 		self.cimg = tbg_s_img
 		self.leftimg = tbg_s_l_img
 		self.rightimg = tbg_s_r_img
 		self.notes = []
+		self.acnotes = []
 		for i in range(88):
-			self.notes.append(audio.open_file('instruments/keyboards/piano1/c.wav'))
+			#self.notes.append(audio.open_file('instruments/keyboards/piano1/c.wav'))
+			self.notes.append(audio.open_file('instruments/strings/basic strings/c.wav'))
 			self.notes[-1].pitchshift = note(i)
+			self.notes[-1].repeating = self.continuous
+			if self.fadein:
+				self.notes[-1].volume = 0
+			self.acnotes.append(False)
 	def img(self):
 		return self.int_img if self==ACTIVETRACK else tg_img
 	def add(self,track):
@@ -538,12 +575,21 @@ class track(object):
 	def play_note(self,noteval, velocity):
 		self.notes[noteval].stop()
 		self.notes[noteval].play()
-		self.notes[noteval].volume = velocity
+		self.acnotes[noteval] = True
+		if self.fadein:
+			#self.notes[noteval].volume = 0
+			fadein_note(None,self.notes,noteval,self.acnotes,self.fadein,velocity)
+		else:
+			self.notes[noteval].volume = velocity
 		if recording:
 			self.tracks[-1].data[-1].append(noteval)
 	def stop_note(self,noteval):
-		#self.notes[noteval].stop()
-		cutoff_note(None,self.notes[noteval],self.cutoff)
+		self.acnotes[noteval] = False
+		if self.cutoff:
+			cutoff_note(None,self.notes,noteval,self.acnotes,self.cutoff)
+		else:
+			pass
+		
 
 		
 class subtrack(object):
@@ -615,7 +661,6 @@ class input(threading.Thread):
 			while not self.stop:
 				m = midiin.getMessage(25) # some timeout in ms
 				if m != None:
-					#print dir(m)
 					if m.isNoteOn():
 						if not m.getNoteNumber() in KEYPRESS_MASK:
 							KEYPRESS_MASK.append(m.getNoteNumber())
@@ -626,6 +671,12 @@ class input(threading.Thread):
 						if m.getNoteNumber() in KEYPRESS_MASK:
 							del KEYPRESS_MASK[KEYPRESS_MASK.index(m.getNoteNumber())]
 							ACTIVETRACK.stop_note(m.getNoteNumber())
+					else:
+						if ACTIVETRACK.pitchbend:
+							pitchbend = m.getPitchWheelValue()/8192.0
+							pitchbend = (pitchbend-1)*0.122+1
+							for i in xrange(len(ACTIVETRACK.notes)):
+								ACTIVETRACK.notes[i].pitchshift = note(i)*pitchbend
 					pyglet.clock.schedule_once(draw,0.01)
 			
 			

@@ -8,6 +8,10 @@
 	<continuous>No</continuous>
 	<!--Amount of time to fade out note when key is released.-->
 	<cutoff>100</cutoff>
+	<!--Amount of time to fade in note when key is pressed.-->
+	<fadein>0</fadein>
+	<!--Whether the pitch can be bent.-->
+	<pitchbend>No</pitchbend>
 	<!--Notes - for best sound quality, provide 1 per octave, especially in the high end.
 	Sound quality degrades noticably when more than a tenth above the base note.-->
 	<notes>
