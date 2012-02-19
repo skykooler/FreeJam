@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<instrument>
+	<!--Name of the instrument.-->
+	<name>Piano 1</name>
+	<!--Description: shown when instrument is selected or moused over.-->
+	<description>Upright Piano</description>
+	<!--Whether it plays notes continuously (like strings or wind) or not (like piano)-->
+	<continuous>No</continuous>
+	<!--Amount of time to fade out note when key is released.-->
+	<cutoff>100</cutoff>
+	<!--Notes - for best sound quality, provide 1 per octave, especially in the high end.
+	Sound quality degrades noticably when more than a tenth above the base note.-->
+	<notes>
+		<c1>c1.wav</c1>
+	</notes>
+</instrument>

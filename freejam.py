@@ -17,6 +17,8 @@ import math
 
 import rtmidi
 
+import xml.etree.ElementTree as etree
+
 audio = audiere.open_device()
 
 stageimg = pyglet.image.load('resources/image-textures/floor.png')
@@ -118,9 +120,72 @@ stagesprite = pyglet.sprite.Sprite(stageimg)
 pyglet.resource.path = ['instruments/keyboards/piano1']
 pyglet.resource.reindex()
 
+def xml_to_dict(el):
+  d={}
+  if el.text:
+    d[el.tag] = el.text
+  else:
+    d[el.tag] = {}
+  children = el.getchildren()
+  def setd(key, val, e):
+    e[key] = val
+  if children:
+    print map(xml_to_dict,children)
+    d[el.tag] = dict([[i.keys()[0],i[i.keys()[0]]] for i in map(xml_to_dict, children)])
+  return d
+  
+def strip_whitespace(list):
+	for i in xrange(len(list)):
+		if type(list[i])==str and list[i].strip()=='':
+			del list[i]
+  
+def xml_to_dictionary(element):
+    namespace = ''
+    l = len(namespace)
+    dictionary={}
+    tag = element.tag[l:]
+    if element.text:
+        if (element.text == ' '):
+            dictionary[tag] = {}
+        else:
+            dictionary[tag] = element.text
+    children = element.getchildren()
+    if children:
+        subdictionary = {}
+        for child in children:
+            for k,v in xml_to_dictionary(child).items():
+                if k in subdictionary:
+                    if ( isinstance(subdictionary[k], list)):
+                        subdictionary[k].append(v)
+                    else:
+                        subdictionary[k] = [subdictionary[k], v]
+                else:
+                    subdictionary[k] = v
+        if (dictionary[tag] == {}):
+            dictionary[tag] = subdictionary
+        else:
+            dictionary[tag] = [dictionary[tag], subdictionary]
+    if element.attrib:
+        attribs = {}
+        for k,v in element.attrib.items():
+            attribs[k] = v
+        if (dictionary[tag] == {}):
+            dictionary[tag] = attribs
+        else:
+            dictionary[tag] = [dictionary[tag], attribs]
+    return dictionary
+
 def draw(*args):
 	#Dummy function to redraw the window
 	pass
+	
+def cutoff_note(dt,note,cutoff):
+	print note.volume
+	if note.volume>0:
+		note.volume-=100.0/(20*cutoff)
+		pyglet.clock.schedule_once(cutoff_note,0.02,note,cutoff)
+	else:
+		note.stop()
 	
 def play_note(noteval, velocity):
 	player = pyglet.media.ManagedSoundPlayer()
@@ -294,7 +359,7 @@ def on_mouse_press(x, y, button, modifiers):
 		#player.pitch = note(noteval)
 		#player.volume = 127
 		#player.play()
-		ACTIVETRACK.play_note(noteval,127)
+		ACTIVETRACK.play_note(noteval,1)
 		return None
 	if max(cx-100,width/3)<x<max(cx-100,width/3)+record_img.width and vbarloc-(barimg.height/2+record_img.height/2)<y<vbarloc-(barimg.height/2)+record_img.height/2:
 		global playing, recording
@@ -372,7 +437,7 @@ def on_mouse_drag(x, y, dx, dy, buttons, modifiers):
 		if not noteval in KEYPRESS_MASK:
 			KEYPRESS_MASK = []
 			KEYPRESS_MASK.append(noteval)
-			ACTIVETRACK.play_note(noteval,127)
+			ACTIVETRACK.play_note(noteval,1)
 		return None
 	
 @window.event
@@ -390,7 +455,7 @@ def on_key_press(symbol, modifiers):
 		noteval = KEYMAP[symbol]
 		if not noteval in KEYPRESS_MASK:
 			KEYPRESS_MASK.append(noteval)
-		ACTIVETRACK.play_note(noteval,127)
+		ACTIVETRACK.play_note(noteval,1)
 	
 @window.event
 def on_key_release(symbol,modifiers):
@@ -439,6 +504,13 @@ class track(object):
 		self.playing=True
 		self.label = pyglet.text.Label('Piano',font_name='Times New Roman',font_size=10)
 		self.labelshadow = pyglet.text.Label('Piano', font_name='Times New Roman', font_size=10, color=(0,0,0,255))
+		self.definition = xml_to_dict(etree.parse('instruments/keyboards/piano1/instrument.xml').getroot())['instrument']
+		print self.definition['cutoff']
+		try:
+			self.cutoff = int(self.definition['cutoff'])
+		except:
+			print 'Cutoff not defined.'
+			self.cutoff = 100
 		self.int_img = tsa_img
 		self.cimg = tbg_s_img
 		self.leftimg = tbg_s_l_img
@@ -466,10 +538,12 @@ class track(object):
 	def play_note(self,noteval, velocity):
 		self.notes[noteval].stop()
 		self.notes[noteval].play()
+		self.notes[noteval].volume = velocity
 		if recording:
 			self.tracks[-1].data[-1].append(noteval)
 	def stop_note(self,noteval):
-		self.notes[noteval].stop()
+		#self.notes[noteval].stop()
+		cutoff_note(None,self.notes[noteval],self.cutoff)
 
 		
 class subtrack(object):
