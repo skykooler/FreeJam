@@ -5,6 +5,7 @@ import os
 
 import pyglet
 
+import audiere
 
 from pyglet import clock
 
@@ -16,6 +17,7 @@ import math
 
 import rtmidi
 
+audio = audiere.open_device()
 
 stageimg = pyglet.image.load('resources/image-textures/floor.png')
 barimg = pyglet.image.load('resources/image-textures/bar.png')
@@ -170,7 +172,7 @@ def on_draw():
 		stagesprite.y = vbarloc
 		stagesprite.draw()
 	elif PLAYMODE=='keyboard':
-		keyscale = max((height-vbarloc)/(key_cf_img.height*1.0),0.125)
+		keyscale = max((height-vbarloc)/(key_cf_img.height*1.0),0.25)
 		index = 0
 		key_cf.scale = keyscale
 		key_dga.scale = keyscale
@@ -280,18 +282,19 @@ def on_mouse_press(x, y, button, modifiers):
 	ch = vbarloc-(barimg.height/2+play_img.height/2)
 	cx = width/2
 	if y>vbarloc and PLAYMODE=='keyboard':
-		keyscale = max((height-vbarloc)/(key_cf_img.height*1.0),0.125)
+		keyscale = max((height-vbarloc)/(key_cf_img.height*1.0),0.25)
 		noteval = int(x/(key_cf_img.width*keyscale)*12/7.0)+36
 		if y<vbarloc+256*keyscale:
 			if noteval%12 in (1,3,6,8,10):
 				noteval-=int(int((x+31)/(key_cf_img.width*keyscale)*12/7.0)+36==noteval)*2-1
 		if not noteval in KEYPRESS_MASK:
 			KEYPRESS_MASK.append(noteval)
-		player = pyglet.media.ManagedSoundPlayer()
-		player.queue(c)
-		player.pitch = note(noteval)
-		player.volume = 127
-		player.play()
+		#player = pyglet.media.ManagedSoundPlayer()
+		#player.queue(c)
+		#player.pitch = note(noteval)
+		#player.volume = 127
+		#player.play()
+		ACTIVETRACK.play_note(noteval,127)
 		return None
 	if max(cx-100,width/3)<x<max(cx-100,width/3)+record_img.width and vbarloc-(barimg.height/2+record_img.height/2)<y<vbarloc-(barimg.height/2)+record_img.height/2:
 		global playing, recording
@@ -369,7 +372,7 @@ def on_mouse_drag(x, y, dx, dy, buttons, modifiers):
 		if not noteval in KEYPRESS_MASK:
 			KEYPRESS_MASK = []
 			KEYPRESS_MASK.append(noteval)
-			play_note(noteval,127)
+			ACTIVETRACK.play_note(noteval,127)
 		return None
 	
 @window.event
@@ -387,13 +390,14 @@ def on_key_press(symbol, modifiers):
 		noteval = KEYMAP[symbol]
 		if not noteval in KEYPRESS_MASK:
 			KEYPRESS_MASK.append(noteval)
-		play_note(noteval,127)
+		ACTIVETRACK.play_note(noteval,127)
 	
 @window.event
 def on_key_release(symbol,modifiers):
 	if symbol in KEYMAP:
 		if KEYMAP[symbol] in KEYPRESS_MASK:
 			del KEYPRESS_MASK[KEYPRESS_MASK.index(KEYMAP[symbol])]
+			ACTIVETRACK.stop_note(KEYMAP[symbol])
 	
 @window.event
 def on_close():
@@ -439,11 +443,16 @@ class track(object):
 		self.cimg = tbg_s_img
 		self.leftimg = tbg_s_l_img
 		self.rightimg = tbg_s_r_img
+		self.notes = []
+		for i in range(88):
+			self.notes.append(audio.open_file('instruments/keyboards/piano1/c.wav'))
+			self.notes[-1].pitchshift = note(i)
 	def img(self):
 		return self.int_img if self==ACTIVETRACK else tg_img
 	def add(self,track):
 		self.tracks.append(track)
 		self.trackslen.append(len(track))
+		track.track = self
 	def play(self,INDEX):
 		b = 0
 		for i in self.tracks:
@@ -454,6 +463,13 @@ class track(object):
 	def set_text(self,text):
 		self.label.text = str(text)
 		self.labelshadow.text = str(text)
+	def play_note(self,noteval, velocity):
+		self.notes[noteval].stop()
+		self.notes[noteval].play()
+		if recording:
+			self.tracks[-1].data[-1].append(noteval)
+	def stop_note(self,noteval):
+		self.notes[noteval].stop()
 
 		
 class subtrack(object):
@@ -464,10 +480,12 @@ class subtrack(object):
 	def play(self,index):
 		if self.data[index]:
 			for i in self.data[index]:
-				player = pyglet.media.ManagedSoundPlayer()
-				player.queue(c)
-				player.pitch = note(i)
-				player.play()
+				#player = pyglet.media.ManagedSoundPlayer()
+				#player.queue(c)
+				#player.pitch = note(i)
+				#player.play()
+				self.track.notes[i].stop()
+				self.track.notes[i].play()
 		return (index==len(self.data)-1)
 	def is_silence(self):
 		return False
@@ -501,7 +519,7 @@ def play(dt):
 	if playing:
 		for i in TRACKS:
 			i.play(INDEX)
-		if INDEX<46:	#TODO: calculate this value
+		if INDEX<256:	#TODO: calculate this value
 			INDEX+=1
 		else:
 			global playing, recording
@@ -527,11 +545,13 @@ class input(threading.Thread):
 					if m.isNoteOn():
 						if not m.getNoteNumber() in KEYPRESS_MASK:
 							KEYPRESS_MASK.append(m.getNoteNumber())
-						play_note(m.getNoteNumber(),(m.getVelocity()/128.0)**2)
+						#play_note(m.getNoteNumber(),(m.getVelocity()/128.0)**2)
+						ACTIVETRACK.play_note(m.getNoteNumber(),(m.getVelocity()/128.0)**2)
 						#window.dispatch_events()
 					elif m.isNoteOff():
 						if m.getNoteNumber() in KEYPRESS_MASK:
 							del KEYPRESS_MASK[KEYPRESS_MASK.index(m.getNoteNumber())]
+							ACTIVETRACK.stop_note(m.getNoteNumber())
 					pyglet.clock.schedule_once(draw,0.01)
 			
 			
