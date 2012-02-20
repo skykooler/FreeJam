@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<instrument>
+	<!--Name of the instrument.-->
+	<name>Basic Strings</name>
+	<!--Description: shown when instrument is selected or moused over.-->
+	<description>String section</description>
+	<!--Whether it plays notes continuously (like strings or wind) or not (like piano)-->
+	<continuous>Yes</continuous>
+	<!--Amount of time to fade out note when key is released.-->
+	<cutoff>50</cutoff>
+	<!--Amount of time to fade in note when key is pressed.-->
+	<fadein>50</fadein>
+	<!--Whether the pitch can be bent.-->
+	<pitchbend>Yes</pitchbend>
+	<!--Notes - for best sound quality, provide 1 per octave, especially in the high end.
+	Sound quality degrades noticably when more than a tenth above the base note.-->
+	<notes>
+		<c1>c.wav</c1>
+	</notes>
+</instrument>
