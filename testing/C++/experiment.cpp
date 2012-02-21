@@ -1,7 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <algorithm>
 #include <GL/glew.h>
-#include <SOIL.h>
+//#include <SOIL.h>
 #include <assert.h>
 #include "png.h"
 #ifdef __APPLE__
@@ -9,6 +10,8 @@
 #else
 #  include <GL/glut.h>
 #endif
+
+using namespace std;
 
 #define PNG_SIG_BYTES 8
 typedef unsigned char     uint8_t;
@@ -27,6 +30,54 @@ class silence {
 void silence::play() {
 	
 }
+
+
+void draw_img(float x, float y, float w, float h, GLuint tex) {
+	//glColor3f(0.0,0.0,0.5);
+	//glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glBegin(GL_QUADS);
+		glTexCoord2f(0.0f, 0.0f);
+		glVertex2f( x, y);
+		glTexCoord2f(1.0f, 0.0f);
+		glVertex2f(w+x, y);
+		glTexCoord2f(1.0f, 1.0f);
+		glVertex2f( w+x, h+y);
+		glTexCoord2f(0.0f, 1.0f);
+		glVertex2f( x, h+y);
+	glEnd();
+}
+
+void draw_rect(float x, float y, float w, float h, float r, float g, float b) {
+	glColor3f(r,g,b);
+	glBegin(GL_QUADS);
+		glTexCoord2f(0.0f, 1.0f);
+		glVertex2f( x, y);
+		glTexCoord2f(1.0f, 1.0f);
+		glVertex2f(w+x, y);
+		glTexCoord2f(1.0f, 0.0f);
+		glVertex2f( w+x, h+y);
+		glTexCoord2f(0.0f, 1.0f);
+		glVertex2f( x, h+y);
+	glEnd();
+}
+
+
+class Img {
+	public:
+		GLuint tex;
+		int width;
+		int height;
+		void blit(float x, float y) {
+			draw_img(x,y,width,height,tex);
+		}
+		void blit(float x, float y, float w) {
+			draw_img(x,y,w,height,tex);
+		}
+		void blit(float x, float y, float w, float h) {
+			draw_img(x,y,w,h,tex);
+		}
+};
 float angle = 0.0f;
 float red = 1.0f;
 float green = 1.0f;
@@ -104,7 +155,7 @@ char * load_png(char *name, int *width, int *height) {
 	return (char *)pixels;
 }
 
-static GLuint load_img(const char *filename) {
+static Img load_img(const char *filename) {
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	
 	GLuint tex;
@@ -120,41 +171,60 @@ static GLuint load_img(const char *filename) {
 	GLubyte *pixels = (GLubyte *)load_png((char*)filename, &w, &h);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 	free(pixels);
-	
-	return tex;
+	Img img;
+	img.tex = tex;
+	img.width = w;
+	img.height = h;
+	return img;
 }
 
-GLuint stageimg = load_img("resources/image-textures/floor.png");
+Img stageimg;
+Img barimg;
+Img record_img;
+Img recording_img;
+Img rw_beg_img;
+Img rw_img;
+Img play_img;
+Img pause_img;
+Img ff_img;
+Img ff_end_img;
+
+Img slider_img;
+
+float vbarloc = 100;
+bool dragging_vbar = false;
+bool dragging_scale = false;
+int STEP = 64; // maximum res is 64th-notes
+float VIEW_SCALE = 1.0;
+int SCROLL = 0;
+int INDEX = 0;
+float PLAYBACK_SPEED = 16.0;
+int STAGE = 57; // 'ST'
+int KEYBOARD = 80; // 'BO' - can't really do 'K'!
+int PLAYMODE = STAGE; // use STAGE or KEYBOARD
+/*KEYPRESS_MASK = []
+NOTE_RATIOS = [1,1.059,1.122,1.189,1.26,1.334,1.4142,1.498,1.587,1.682,1.7818,1.887]
+KEYMAP = {key.A:36,key.W:37,key.S:38,key.E:39,key.D:40,key.F:41,key.T:42,
+			key.G:43,key.Y:44,key.H:45,key.U:46,key.J:47,key.K:48,
+			key.O:49,key.L:50,key.P:51,key.SEMICOLON:52,key.APOSTROPHE:53}*/
+bool playing = false;
+bool recording = false;
+float pitchbend = 1.0;
 
 
-void draw_img(float x, float y, float w, float h, GLuint tex) {
-	glColor3f(0.0,0.0,0.5);
-	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, tex);
-	glBegin(GL_QUADS);
-		glTexCoord2f(0.0f, 1.0f);
-		glVertex2f( x, y);
-		glTexCoord2f(1.0f, 1.0f);
-		glVertex2f(w+x, y);
-		glTexCoord2f(1.0f, 0.0f);
-		glVertex2f( w+x, h+y);
-		glTexCoord2f(0.0f, 1.0f);
-		glVertex2f( x, h+y);
-	glEnd();
-}
+void load_all_images() {
+	stageimg = load_img("resources/image-textures/floor.png");
+	barimg = load_img("resources/image-textures/bar.png");
+	record_img = load_img("resources/image-textures/record_b.png");
+	recording_img = load_img("resources/image-textures/record_active.png");
+	rw_beg_img = load_img("resources/image-textures/rewind_to_beginning.png");
+	rw_img = load_img("resources/image-textures/rewind.png");
+	play_img = load_img("resources/image-textures/play.png");
+	pause_img = load_img("resources/image-textures/pause.png");
+	ff_img = load_img("resources/image-textures/fastforward.png");
+	ff_end_img = load_img("resources/image-textures/forward_to_end.png");
 
-void draw_rect(float x, float y, float w, float h, float r, float g, float b) {
-	glColor3f(r,g,b);
-	glBegin(GL_QUADS);
-		glTexCoord2f(0.0f, 1.0f);
-		glVertex2f( x, y);
-		glTexCoord2f(1.0f, 1.0f);
-		glVertex2f(w+x, y);
-		glTexCoord2f(1.0f, 0.0f);
-		glVertex2f( w+x, h+y);
-		glTexCoord2f(0.0f, 1.0f);
-		glVertex2f( x, h+y);
-	glEnd();
+	slider_img = load_img("resources/image-textures/slider.png");
 }
 
 void draw(void) {
@@ -172,12 +242,48 @@ void draw(void) {
 	gluOrtho2D(0, 1024, 0, 600);
 	glMatrixMode(GL_MODELVIEW);
 	
-	draw_rect(200,200,50,100,red,green,blue);
-
-	draw_img(100.0f,100.0f,100.0f,100.0f, stageimg);
-
-	angle+=0.1f;
-
+	//draw_rect(200,200,50,100,red,green,blue);
+	if (PLAYMODE==STAGE) {
+		draw_img(0.0f,vbarloc,width,height-vbarloc, stageimg.tex);
+	}
+	draw_img(0,vbarloc-barimg.height,width,barimg.height,barimg.tex);
+	float controlheight = vbarloc-(barimg.height/2+play_img.height/2);
+	float controlsx = width/2;
+	if (recording){
+		recording_img.blit(max(controlsx-100,width/3.0f),
+					vbarloc-(barimg.height/2.0f+record_img.height/2.0f));
+	} else {
+		record_img.blit(max(controlsx-100,width/3.0f),
+					vbarloc-(barimg.height/2.0f+record_img.height/2.0f));
+	}
+	rw_beg_img.blit(controlsx,controlheight);
+	controlsx+=rw_beg_img.width;
+	rw_img.blit(controlsx,controlheight);
+	controlsx+=rw_img.width;
+	if (playing){
+		pause_img.blit(controlsx,controlheight);
+		controlsx+=pause_img.width;
+	} else {
+		play_img.blit(controlsx,controlheight);
+		controlsx+=play_img.width;
+	}
+	ff_img.blit(controlsx,controlheight);
+	controlsx+=ff_img.width;
+	ff_end_img.blit(controlsx,controlheight);
+	/*------------------------------*/
+	
+	/*---------- Tracks ------------*/
+	draw_rect(0,0,width,vbarloc-barimg.height,0.75f,0.75f,0.75f);
+	//rgb184184184.blit(0,0,width=width,height=vbarloc-barimg.height)
+	//for i in xrange(len(TRACKS)):
+	//	draw_track(TRACKS[i],i,width)
+	//rgb084084084.blit(150,0,height=vbarloc-barimg.height)
+	//rgb255000000.blit(151+(INDEX-SCROLL)*VIEW_SCALE,0,height=vbarloc-barimg.height)
+	//rgb237237237.blit(151,0,width=width-150,height=16)
+	//rgb084084084.blit(155,8,width=width-159)
+	//slider_img.blit(min(VIEW_SCALE*64+154,width-8),4)
+	/*------------------------------*/
+	
 	glutSwapBuffers();
 }
 
@@ -242,6 +348,10 @@ int main(int argc, char **argv) {
 	glutInitWindowSize(1024, 600);
 	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
 	glutCreateWindow("FreeJam - Experimental C++ Backend");
+	load_all_images();
+	glEnable( GL_TEXTURE_2D );
+	glEnable (GL_BLEND);
+	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
 	// register callbacks
 	glutDisplayFunc(draw);
