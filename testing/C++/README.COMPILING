@@ -1,0 +1,1 @@
+gcc -o experiment experiment.cpp -I/usr/X11R6/include -I/usr/include/SOIL -L/usr/X11R6/lib -lGL -lGLEW -lglut -lpng
