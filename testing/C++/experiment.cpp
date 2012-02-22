@@ -21,20 +21,6 @@ typedef unsigned char     uint8_t;
 typedef unsigned short    uint16_t;
 typedef unsigned int      uint32_t;
 
-class silence {
-	int n;
-	
-	silence(int n);
-	void play();
-	bool is_silence() { return true; };
-	int length() { return n; }
-
-};
-void silence::play() {
-	
-}
-
-
 void draw_img(float x, float y, float w, float h, GLuint tex) {
 	glColor3f(1.0,1.0,1.0);
 	glEnable(GL_TEXTURE_2D);
@@ -78,8 +64,7 @@ GLvoid * glutFonts[7] = {
 }; 
 
 // Here is the function 
-void glutPrint(float x, float y, GLvoid *font, char* text, float r, float g, float b, float a) 
-{ 
+void glutPrint(float x, float y, GLvoid *font, char* text, float r, float g, float b, float a) { 
     if(!text || !strlen(text)) return; 
     bool blending = false; 
     if(glIsEnabled(GL_BLEND)) blending = true; 
@@ -272,6 +257,7 @@ int VIEW_EXTENTS [2];
 /*KEYMAP = {key.A:36,key.W:37,key.S:38,key.E:39,key.D:40,key.F:41,key.T:42,
 			key.G:43,key.Y:44,key.H:45,key.U:46,key.J:47,key.K:48,
 			key.O:49,key.L:50,key.P:51,key.SEMICOLON:52,key.APOSTROPHE:53}*/
+int KEYMAP [512];
 bool playing = false;
 bool recording = false;
 float pitchbend = 1.0;
@@ -305,6 +291,19 @@ Label::Label(){
 	text = (char *)"Mana oh mana";
 }
 
+class Silence {
+	int n;
+	
+	Silence(int n);
+	void play();
+	bool is_silence() { return true; };
+	int length() { return n; }
+
+};
+void Silence::play() {
+	
+}
+
 class Subtrack {
 	public:
 		vector<vector<int[3]> > data;
@@ -312,6 +311,25 @@ class Subtrack {
 		int __len__() {return data.size();/*return 30;*/};
 };
 
+/*Multiline comment for code folding to preserve line #s with Python
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+*/
 class Track {
 	private:
 		Img * int_img;
@@ -357,6 +375,49 @@ Track::Track () {
   labelshadow.text = name;
 }
 
+/*
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+*/
 vector<Track> TRACKS;
 Track * ACTIVETRACK;
 
@@ -407,6 +468,64 @@ void load_all_images() {
 
 }
 
+void init_keys() {
+	KEYMAP['a']=36;
+	KEYMAP['w']=37;
+	KEYMAP['s']=38;
+	KEYMAP['e']=39;
+	KEYMAP['d']=40;
+	KEYMAP['f']=41;
+	KEYMAP['t']=42;
+	KEYMAP['g']=43;
+	KEYMAP['y']=44;
+	KEYMAP['h']=45;
+	KEYMAP['u']=46;
+	KEYMAP['j']=47;
+	KEYMAP['k']=48;
+	KEYMAP['o']=49;
+	KEYMAP['l']=50;
+	KEYMAP['p']=51;
+	KEYMAP[';']=52;
+	KEYMAP['\'']=53;
+}
+
+/*
+  
+  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ */
 void draw_track(Track track, int num, int width) {
 	float BASE_HEIGHT=(vbarloc-barimg.height)-((num+1)*track.img().height);
 	trackbg_img.blit(0,BASE_HEIGHT,width);
@@ -452,7 +571,7 @@ void draw_track(Track track, int num, int width) {
 }
 
 
-void draw(void) {
+void on_draw(void) {
 
 	// Clear Color and Depth Buffers
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -519,8 +638,56 @@ void draw(void) {
 	
 	glutSwapBuffers();
 }
+/*
 
-void mouse_press(int x, int y, int button, int modifiers) {
+ 
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+*/
+void on_mouse_press(int x, int y, int button, int modifiers) {
 	float ch = vbarloc-(barimg.height/2+play_img.height/2);
 	float cx = width/2;
 	if (y>vbarloc and PLAYMODE==KEYBOARD){
@@ -594,8 +761,11 @@ void mouse_press(int x, int y, int button, int modifiers) {
 		//
 	}
 }
+/*
 
-void mouse_drag(int x, int y, int dx, int dy, int button, int modifiers) {
+
+*/
+void on_mouse_drag(int x, int y, int dx, int dy, int button, int modifiers) {
 	if (dragging_vbar){
 		vbarloc=max(min(vbarloc+dy,(float)height),(float)(barimg.height));
 	} else if (dragging_scale){
@@ -622,7 +792,7 @@ void mouse_drag(int x, int y, int dx, int dy, int button, int modifiers) {
 		return;
 	}
 }
-void mouse_release(int x, int y, int button, int modifiers) {
+void on_mouse_release(int x, int y, int button, int modifiers) {
 	dragging_vbar = false;
 	for (uint8_t i=0; i<len(KEYPRESS_MASK); i++) {
 		(*ACTIVETRACK).stop_note(i);
@@ -630,13 +800,41 @@ void mouse_release(int x, int y, int button, int modifiers) {
 	for (uint16_t i=0; i<len(KEYPRESS_MASK); i++){ KEYPRESS_MASK[i]=0; }
 	dragging_scale = false;
 }
+/*
 
-void processNormalKeys(unsigned char key, int x, int y) {
-
-	if (key == 27)
-		exit(0);
+*/
+void on_key_press(int symbol, int modifiers) {
+	if ((bool)KEYMAP[symbol]){
+		int noteval = KEYMAP[symbol];
+		if (not KEYPRESS_MASK[noteval]){
+			KEYPRESS_MASK[noteval] = true;
+		}
+		(*ACTIVETRACK).play_note(noteval,1);
+	}
+}
+void on_key_release(int symbol, int modifiers){
+	if ((bool)KEYMAP[symbol]){
+		if (KEYPRESS_MASK[KEYMAP[symbol]]) {
+			KEYPRESS_MASK[KEYMAP[symbol]] = false;
+			(*ACTIVETRACK).stop_note(KEYMAP[symbol]);
+		}
+	}
 }
 
+void processNormalKeys(unsigned char key, int x, int y) {
+	if (key == 27) {
+		exit(0);
+	} else {
+		on_key_press(key, 0);
+	}
+}
+void processNormalKeysUp(unsigned char key, int x, int y) {
+	if (key == 27) {
+		exit(0);
+	} else {
+		on_key_release(key, 0);
+	}
+}
 void processSpecialKeys(int key, int x, int y) {
 
 	switch(key) {
@@ -652,6 +850,16 @@ void processSpecialKeys(int key, int x, int y) {
 				red = 0.0;
 				green = 0.0;
 				blue = 1.0; break;
+	}
+	glutPostRedisplay();
+}
+void processSpecialKeysUp(int key, int x, int y) {
+
+	switch(key) {
+		case GLUT_KEY_F1 :
+				red = 1.0;
+				green = 0.0;
+				blue = 0.0; break;
 	}
 	glutPostRedisplay();
 }
@@ -686,9 +894,9 @@ void changeSize(int w, int h) {
 
 static void mouse(int button, int state, int x, int y) {
 	if (state == GLUT_DOWN) {
-		mouse_press(x, height-y, button, glutGetModifiers());
+		on_mouse_press(x, height-y, button, glutGetModifiers());
 	} else if (state == GLUT_UP) {
-		mouse_release(x, height-y, button, glutGetModifiers());
+		on_mouse_release(x, height-y, button, glutGetModifiers());
 	}
 	lastx = x;
 	lasty = y;
@@ -696,7 +904,7 @@ static void mouse(int button, int state, int x, int y) {
 }
 static void drag(int x, int y) {
 	//TODO: dynamically set the button if rught-click drags are possible
-	mouse_drag(x, height-y, x-lastx, lasty-y, GLUT_LEFT_BUTTON, glutGetModifiers());
+	on_mouse_drag(x, height-y, x-lastx, lasty-y, GLUT_LEFT_BUTTON, glutGetModifiers());
 	lastx = x;
 	lasty = y;
 	//draw();
@@ -706,6 +914,7 @@ int main(int argc, char **argv) {
 
 	// init tracks
 	TRACKS.push_back(Track());
+	ACTIVETRACK = &TRACKS[0];
 
 	// init GLUT and create window
 	glutInit(&argc, argv);
@@ -719,11 +928,13 @@ int main(int argc, char **argv) {
 	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
 	// register callbacks
-	glutDisplayFunc(draw);
+	glutDisplayFunc(on_draw);
 	glutReshapeFunc(changeSize);
-	glutIdleFunc(draw);
+	glutIdleFunc(on_draw);
 	glutKeyboardFunc(processNormalKeys);
 	glutSpecialFunc(processSpecialKeys);
+	glutKeyboardUpFunc(processNormalKeysUp);
+	glutSpecialUpFunc(processSpecialKeysUp);
 	glutMotionFunc(&drag);
     glutMouseFunc(&mouse);
 

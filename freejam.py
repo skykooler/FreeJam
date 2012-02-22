@@ -21,6 +21,80 @@ import xml.etree.ElementTree as etree
 
 audio = audiere.open_device()
 
+#Multiline comment for folding - space is to maintain line #s with C++
+'''
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+'''
+
+#### Global variables ######
 stageimg = pyglet.image.load('resources/image-textures/floor.png')
 barimg = pyglet.image.load('resources/image-textures/bar.png')
 record_img = pyglet.image.load('resources/image-textures/record_b.png')
@@ -84,7 +158,6 @@ key_black_pressed = pyglet.sprite.Sprite(key_black_pressed_img)
 window = pyglet.window.Window(resizable=True)
 window.maximize()
 
-#### Global variables ######
 global vbarloc
 global dragging_vbar
 global dragging_scale
@@ -116,6 +189,250 @@ playing = False
 recording = False
 pitchbend = 1.0
 ############################
+
+'''
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+'''
+class Silence(object):
+	def __getitem__(self,item):
+		return None
+	def __len__(self):
+		return self.n
+	def __init__(self,n):
+		self.n = n
+	def play(self,index):
+		return index==self.n-1
+	def is_silence(self):
+		return True
+	
+
+	
+class Subtrack(object):
+	def __len__(self):
+		return len(self.data)
+	def __init__(self):
+		self.data = []
+	def play(self,index):
+		if self.data[index]:
+			for [i,j,k] in self.data[index]:
+				#player = pyglet.media.ManagedSoundPlayer()
+				#player.queue(c)
+				#player.pitch = note(i)
+				#player.play()
+				self.track.notes[i].stop()
+				self.track.notes[i].play()
+				self.track.acnotes[i] = True
+				if self.track.fadein:
+					fadein_note(None,self.track.notes,i,self.track.acnotes,self.track.fadein,j)
+				else:
+					self.track.notes[i].volume = j
+				pyglet.clock.schedule_once(self.stop_note,k,i)
+		return (index==len(self.data)-1)
+	def is_silence(self):
+		return False
+	def stop_note(self,dt,noteval):
+		self.track.stop_note(noteval)
+	
+class Track(object):
+	def __init__(self):
+		self.tracks=[]
+		self.trackslen=[0]
+		self.tracksindex=0
+		self.playing=True
+		#self.definition = xml_to_dict(etree.parse('instruments/keyboards/piano1/instrument.xml').getroot())['instrument']
+		self.definition = xml_to_dict(etree.parse('instruments/strings/basic strings/instrument.xml').getroot())['instrument']
+		try:
+			self.cutoff = int(self.definition['cutoff'])
+		except:
+			self.cutoff = 100
+		try:
+			self.fadein = int(self.definition['fadein'])
+		except:
+			self.fadein = 0
+		try:
+			self.name = self.definition['name']
+		except:
+			self.name = 'Untitled instrument'
+		try:
+			self.continuous = True if self.definition['continuous'].lower()=='yes' else False
+		except:
+			self.continuous = False
+		try:
+			self.pitchbend = True if self.definition['pitchbend'].lower()=='yes' else False
+		except:
+			self.pitchbend = False
+		self.label = pyglet.text.Label(self.name,font_name='Times New Roman',font_size=10)
+		self.labelshadow = pyglet.text.Label(self.name, font_name='Times New Roman', font_size=10, color=(0,0,0,255))
+		self.int_img = tsa_img
+		self.cimg = tbg_s_img
+		self.leftimg = tbg_s_l_img
+		self.rightimg = tbg_s_r_img
+		self.notes = []
+		self.acnotes = []
+		self.recnotes = []
+		for i in range(88):
+			#self.notes.append(audio.open_file('instruments/keyboards/piano1/c.wav'))
+			self.notes.append(audio.open_file('instruments/strings/basic strings/c.wav'))
+			self.notes[-1].pitchshift = note(i)
+			self.notes[-1].repeating = self.continuous
+			if self.fadein:
+				self.notes[-1].volume = 0
+			self.acnotes.append(False)
+			self.recnotes.append(None)
+	def img(self):
+		return self.int_img if self==ACTIVETRACK else tg_img
+	def add(self,track):
+		self.tracks.append(track)
+		self.trackslen.append(len(track))
+		track.track = self
+	def play(self,INDEX):
+		b = 0
+		for i in self.tracks:
+			if INDEX-b<len(i):
+				return i.play(INDEX-b)
+			else:
+				b+=len(i)
+	def set_text(self,text):
+		self.label.text = str(text)
+		self.labelshadow.text = str(text)
+	def play_note(self,noteval, velocity):
+		self.notes[noteval].stop()
+		self.notes[noteval].play()
+		self.acnotes[noteval] = True
+		if self.fadein:
+			#self.notes[noteval].volume = 0
+			fadein_note(None,self.notes,noteval,self.acnotes,self.fadein,velocity)
+		else:
+			self.notes[noteval].volume = velocity
+		if recording:
+			self.tracks[-1].data[-1].append([noteval,velocity,1])
+			self.recnotes[noteval]=[self.tracks[-1].data[-1],len(self.tracks[-1].data)]
+	def stop_note(self,noteval):
+		self.acnotes[noteval] = False
+		if recording:
+			self.recnotes[noteval][0]=len(self.tracks[-1].data)-self.recnotes[noteval][1]
+		if self.cutoff:
+			cutoff_note(None,self.notes,noteval,self.acnotes,self.cutoff)
+		else:
+			pass
+	
+
+def log(message):
+	pass
+
+
+track1 = Subtrack()
+track1.data = [[0.5,1],None,None,[0.561,1.122],[0.63,1.26],
+		[0.667,1.334],None,[0.7071,1.4142],[0.749,1.498],None]
+track2 = Subtrack()
+track2.data = [None,None,[1.498,2,2.52,2.996],None,None,None,[2,2.52,2.996]]
+
+TRACKS = [Track(),Track()]
+ACTIVETRACK = TRACKS[0]
+#TRACKS[0].add(track1)
+#TRACKS[0].add(Silence(5))
+#TRACKS[0].add(track1)
+#TRACKS[0].add(track1)
+#TRACKS[1].add(track2)
+
+TRACKSINDEX = [0]
 
 stagesprite = pyglet.sprite.Sprite(stageimg)
 
@@ -208,6 +525,7 @@ def play_note(noteval, velocity):
 		ACTIVETRACK.tracks[-1].data[-1].append([noteval,velocity,notelen])
 
 SIDE_WIDTH = 150
+
 def draw_track(track,num,width):
 	BASE_HEIGHT=(vbarloc-barimg.height)-((num+1)*track.img().height)
 	trackbg_img.blit(0,BASE_HEIGHT,width=width)
@@ -237,6 +555,21 @@ def draw_track(track,num,width):
 	track.labelshadow.draw()
 	track.label.draw()
 
+'''
+
+
+
+
+
+
+
+
+
+
+
+
+
+'''
 @window.event
 def on_draw():
 	window.clear()
@@ -455,6 +788,9 @@ def on_mouse_drag(x, y, dx, dy, buttons, modifiers):
 			ACTIVETRACK.play_note(noteval,1)
 		return None
 	
+'''
+
+'''
 @window.event
 def on_mouse_release(x, y, button, modifiers):
 	global dragging_vbar
@@ -473,7 +809,8 @@ def on_key_press(symbol, modifiers):
 		if not noteval in KEYPRESS_MASK:
 			KEYPRESS_MASK.append(noteval)
 		ACTIVETRACK.play_note(noteval,1)
-	
+
+
 @window.event
 def on_key_release(symbol,modifiers):
 	if symbol in KEYMAP:
@@ -501,151 +838,7 @@ def note(val):
 	else:
 		return (2**(int(val)/12))*NOTE_RATIOS[val%12]
 
-class silence(object):
-	def __getitem__(self,item):
-		return None
-	def __len__(self):
-		return self.n
-	def __init__(self,n):
-		self.n = n
-	def play(self,index):
-		return index==self.n-1
-	def is_silence(self):
-		return True
-		
-class track(object):
-	def __init__(self):
-		self.tracks=[]
-		self.trackslen=[0]
-		self.tracksindex=0
-		self.playing=True
-		#self.definition = xml_to_dict(etree.parse('instruments/keyboards/piano1/instrument.xml').getroot())['instrument']
-		self.definition = xml_to_dict(etree.parse('instruments/strings/basic strings/instrument.xml').getroot())['instrument']
-		try:
-			self.cutoff = int(self.definition['cutoff'])
-		except:
-			self.cutoff = 100
-		try:
-			self.fadein = int(self.definition['fadein'])
-		except:
-			self.fadein = 0
-		try:
-			self.name = self.definition['name']
-		except:
-			self.name = 'Untitled instrument'
-		try:
-			self.continuous = True if self.definition['continuous'].lower()=='yes' else False
-		except:
-			self.continuous = False
-		try:
-			self.pitchbend = True if self.definition['pitchbend'].lower()=='yes' else False
-		except:
-			self.pitchbend = False
-		self.label = pyglet.text.Label(self.name,font_name='Times New Roman',font_size=10)
-		self.labelshadow = pyglet.text.Label(self.name, font_name='Times New Roman', font_size=10, color=(0,0,0,255))
-		self.int_img = tsa_img
-		self.cimg = tbg_s_img
-		self.leftimg = tbg_s_l_img
-		self.rightimg = tbg_s_r_img
-		self.notes = []
-		self.acnotes = []
-		self.recnotes = []
-		for i in range(88):
-			#self.notes.append(audio.open_file('instruments/keyboards/piano1/c.wav'))
-			self.notes.append(audio.open_file('instruments/strings/basic strings/c.wav'))
-			self.notes[-1].pitchshift = note(i)
-			self.notes[-1].repeating = self.continuous
-			if self.fadein:
-				self.notes[-1].volume = 0
-			self.acnotes.append(False)
-			self.recnotes.append(None)
-	def img(self):
-		return self.int_img if self==ACTIVETRACK else tg_img
-	def add(self,track):
-		self.tracks.append(track)
-		self.trackslen.append(len(track))
-		track.track = self
-	def play(self,INDEX):
-		b = 0
-		for i in self.tracks:
-			if INDEX-b<len(i):
-				return i.play(INDEX-b)
-			else:
-				b+=len(i)
-	def set_text(self,text):
-		self.label.text = str(text)
-		self.labelshadow.text = str(text)
-	def play_note(self,noteval, velocity):
-		self.notes[noteval].stop()
-		self.notes[noteval].play()
-		self.acnotes[noteval] = True
-		if self.fadein:
-			#self.notes[noteval].volume = 0
-			fadein_note(None,self.notes,noteval,self.acnotes,self.fadein,velocity)
-		else:
-			self.notes[noteval].volume = velocity
-		if recording:
-			self.tracks[-1].data[-1].append([noteval,velocity,1])
-			self.recnotes[noteval]=[self.tracks[-1].data[-1],len(self.tracks[-1].data)]
-	def stop_note(self,noteval):
-		self.acnotes[noteval] = False
-		if recording:
-			self.recnotes[noteval][0]=len(self.tracks[-1].data)-self.recnotes[noteval][1]
-		if self.cutoff:
-			cutoff_note(None,self.notes,noteval,self.acnotes,self.cutoff)
-		else:
-			pass
-		
 
-		
-class subtrack(object):
-	def __len__(self):
-		return len(self.data)
-	def __init__(self):
-		self.data = []
-	def play(self,index):
-		if self.data[index]:
-			for [i,j,k] in self.data[index]:
-				#player = pyglet.media.ManagedSoundPlayer()
-				#player.queue(c)
-				#player.pitch = note(i)
-				#player.play()
-				self.track.notes[i].stop()
-				self.track.notes[i].play()
-				self.track.acnotes[i] = True
-				if self.track.fadein:
-					fadein_note(None,self.track.notes,i,self.track.acnotes,self.track.fadein,j)
-				else:
-					self.track.notes[i].volume = j
-				pyglet.clock.schedule_once(self.stop_note,k,i)
-		return (index==len(self.data)-1)
-	def is_silence(self):
-		return False
-	def stop_note(self,dt,noteval):
-		self.track.stop_note(noteval)
-		
-		
-
-
-def log(message):
-	pass
-
-
-track1 = subtrack()
-track1.data = [[0.5,1],None,None,[0.561,1.122],[0.63,1.26],
-		[0.667,1.334],None,[0.7071,1.4142],[0.749,1.498],None]
-track2 = subtrack()
-track2.data = [None,None,[1.498,2,2.52,2.996],None,None,None,[2,2.52,2.996]]
-
-TRACKS = [track(),track()]
-ACTIVETRACK = TRACKS[0]
-#TRACKS[0].add(track1)
-#TRACKS[0].add(silence(5))
-#TRACKS[0].add(track1)
-#TRACKS[0].add(track1)
-#TRACKS[1].add(track2)
-
-TRACKSINDEX = [0]
 
 
 def play(dt):
