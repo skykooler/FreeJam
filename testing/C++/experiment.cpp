@@ -83,6 +83,7 @@ void glutPrint(float x, float y, GLvoid *font, char* text, float r, float g, flo
     if(glIsEnabled(GL_BLEND)) blending = true; 
     glEnable(GL_BLEND); 
     glColor4f(r,g,b,a); 
+	glDisable(GL_TEXTURE_2D);
     glRasterPos2f(x,y); 
     while (*text) { 
         glutBitmapCharacter(font, *text); 
@@ -284,17 +285,16 @@ class Label {
 Label::Label(){
 	font = GLUT_BITMAP_TIMES_ROMAN_24;
 	font_size = 12;
-	r = 0.0;
-	g = 0.0;
-	b = 0.0;
+	r = 1.0;
+	g = 1.0;
+	b = 1.0;
 	a = 0.5;
 	text = (char *)"Mana oh mana";
 }
 
 class Subtrack {
-	private:
-		vector<int[3]> data;
 	public:
+		vector<vector<int[3]> > data;
 		bool is_silence() { return true; };
 		int __len__() {return data.size();/*return 30;*/};
 };
@@ -324,6 +324,10 @@ Track::Track () {
   label.g = 1.0;
   label.b = 1.0;
   label.a = 1.0;
+  labelshadow.r = 0.0;
+  labelshadow.g = 0.0;
+  labelshadow.b = 0.0;
+  labelshadow.a = 0.5;
   name = (char *)"Untitled Track";
   label.text = name;
   labelshadow.text = name;
@@ -390,14 +394,20 @@ void draw_track(Track track, int num, int width) {
 			(*track.leftimg).blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+4);
 			(*track.cimg).blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+5,BASE_HEIGHT+4,i.__len__()*VIEW_SCALE-8);
 			(*track.rightimg).blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+i.__len__()*VIEW_SCALE-4,BASE_HEIGHT+4);
-			/*for j in xrange(len(i.data)):
-				if i.data[j]:
-					for [k,l,m] in i.data[j]:
-						rgb084084084.blit((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+8+k%28,width=m*VIEW_SCALE)
+			for (uint32_t j=0; j<i.data.size(); j++) {
+				if (!(i.data[j].size()==0)){
+					//I think it is safe to make this 8 bits. There's only 88 possible keys.
+					for (uint8_t r=0; r<i.data[j].size(); r++) {
+						int k = *i.data[j][0];
+						//int l = *i.data[j][1];
+						int m = *i.data[j][2];
+						draw_rect((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+8+k%28,m*VIEW_SCALE,1,0.33,0.33,0.33);
 					}
 				}
-			}*/
+			}
 		}
+		time_index+=i.__len__();
+		track_index+=1;
 	}
 	track.img().blit(0,BASE_HEIGHT,SIDE_WIDTH,track.img().height);
 	track.labelshadow.x = 15;
@@ -461,11 +471,15 @@ void draw(void) {
 	for (uint32_t i=0; i<TRACKS.size();i++){
 		draw_track(TRACKS[i],i,width);
 	}
+	draw_rect(150,0,1,vbarloc-barimg.height,0.33,0.33,0.33);
 	//rgb084084084.blit(150,0,height=vbarloc-barimg.height)
+	draw_rect(151+(INDEX-SCROLL)*VIEW_SCALE,0,1,vbarloc-barimg.height,1.0,0,0);
 	//rgb255000000.blit(151+(INDEX-SCROLL)*VIEW_SCALE,0,height=vbarloc-barimg.height)
+	draw_rect(151,0,width-150,16,0.93,0.93,0.93);
 	//rgb237237237.blit(151,0,width=width-150,height=16)
+	draw_rect(155,8,width-159,1,0.33,0.33,0.33);
 	//rgb084084084.blit(155,8,width=width-159)
-	//slider_img.blit(min(VIEW_SCALE*64+154,width-8),4)
+	slider_img.blit(min(VIEW_SCALE*64+154,(float)(width-8)),4.0);
 	/*------------------------------*/
 	
 	glutSwapBuffers();
