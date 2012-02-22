@@ -25,7 +25,8 @@ audio = audiere.open_device()
 '''
 
 
-
+ 
+ 
 
 
 

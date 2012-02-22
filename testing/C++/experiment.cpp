@@ -6,6 +6,9 @@
 //#include <SOIL.h>
 #include <assert.h>
 #include "png.h"
+#include <boost/thread.hpp>
+#include <boost/interprocess/sync/named_mutex.hpp>
+#include <boost/interprocess/sync/scoped_lock.hpp>
 #ifdef __APPLE__
 #  include <GLUT/glut.h>
 #else
@@ -355,7 +358,10 @@ class Track {
 		void add(Subtrack subtrack) {
 			tracks.push_back(subtrack);
 			trackslen.push_back(subtrack.__len__());
-		}
+		};
+		void play(int INDEX) {
+			
+		};
 };
 Track::Track () {
   int_img = &tsa_img;
@@ -821,6 +827,26 @@ void on_key_release(int symbol, int modifiers){
 	}
 }
 
+static void play(int dummy) {
+	if (playing){
+		for (uint8_t j=0; j<(TRACKS).size(); j++) {
+			Track * i = &(TRACKS)[j];
+			(*i).play(INDEX);
+		}
+		if (INDEX<256){	//TODO: calculate this value
+			INDEX+=1;
+		} else {
+			playing = false;
+			recording = false;
+		}
+		if (recording) {
+			(*ACTIVETRACK).tracks[(*ACTIVETRACK).tracks.size()-1].data.resize((*ACTIVETRACK).tracks[(*ACTIVETRACK).tracks.size()-1].data.size()+1);
+			//(*ACTIVETRACK).tracks[(*ACTIVETRACK).tracks.size()-1].data.resize(100);
+		}
+	}
+	glutTimerFunc (1000/PLAYBACK_SPEED, play, 0);
+};
+
 void processNormalKeys(unsigned char key, int x, int y) {
 	if (key == 27) {
 		exit(0);
@@ -938,8 +964,13 @@ int main(int argc, char **argv) {
 	glutMotionFunc(&drag);
     glutMouseFunc(&mouse);
 
+	glutTimerFunc (1000/PLAYBACK_SPEED, play, 0);
+	//boost::thread playThread(boost::bind(play, &playing, &recording, 
+	//							&TRACKS, &ACTIVETRACK, &INDEX));
+
 	// enter GLUT event processing cycle
 	glutMainLoop();
+	//playThread.join();
 	
 	return 1;
 

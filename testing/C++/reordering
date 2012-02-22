@@ -1,0 +1,41 @@
+  C++				|  Python
+draw_img
+draw_rect
+glutPrint
+class Img
+load_png
+load_img
+*globals declaration*		*globals declaration*
+class Label
+class Silence			class Silence
+class Subtrack			class Subtrack
+class Track			class Track
+*TRACKS declaration*		*TRACKS declaration*
+				log
+				xml_to_dict
+				strip_whitespace
+				xml_to_dictionary
+load_all_images	
+init_keys
+				draw
+				cutoff_note
+				fadein_note
+draw_track			draw_track
+on_draw				on_draw
+on_mouse_press			on_mouse_press
+on_mouse_drag			on_mouse_drag
+on_mouse_release		on_mouse_release
+on_key_press			on_key_press
+on_key_release			on_key_release
+				on_close
+				note
+processNormalKeys
+processNormalKeysUp
+processSpecialKeys
+processSpecialKeysUp		
+changeSize			
+mouse				
+drag
+				play
+				class input
+main				call to main
