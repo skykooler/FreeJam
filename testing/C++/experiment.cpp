@@ -14,6 +14,8 @@
 
 using namespace std;
 
+#define len(a) ( sizeof ( a ) / sizeof ( *a ) )
+
 #define PNG_SIG_BYTES 8
 typedef unsigned char     uint8_t;
 typedef unsigned short    uint16_t;
@@ -241,6 +243,15 @@ Img tbg_o_r_img;
 
 Img trackbg_img;
 
+Img key_cf_img;
+Img key_dga_img;
+Img key_eb_img;
+Img key_black_img;
+Img key_cf_pressed_img;
+Img key_dga_pressed_img;
+Img key_eb_pressed_img;
+Img key_black_pressed_img;
+
 float vbarloc = 100;
 bool dragging_vbar = false;
 bool dragging_scale = false;
@@ -265,6 +276,8 @@ bool playing = false;
 bool recording = false;
 float pitchbend = 1.0;
 int SIDE_WIDTH = 150;
+int lastx = 0;
+int lasty = 0;
 
 class Label {
 	public:
@@ -311,9 +324,20 @@ class Track {
 		Label labelshadow;
 		Track();
 		vector<Subtrack> tracks;
+		vector<int> trackslen;
 		Img img() {
 			return *int_img;
 		};
+		void play_note(int noteval,float volume) {
+		
+		};
+		void stop_note(int noteval) {
+			
+		};
+		void add(Subtrack subtrack) {
+			tracks.push_back(subtrack);
+			trackslen.push_back(subtrack.__len__());
+		}
 };
 Track::Track () {
   int_img = &tsa_img;
@@ -334,6 +358,7 @@ Track::Track () {
 }
 
 vector<Track> TRACKS;
+Track * ACTIVETRACK;
 
 void load_all_images() {
 	stageimg = load_img("resources/image-textures/floor.png");
@@ -370,7 +395,15 @@ void load_all_images() {
 	tbg_o_r_img = load_img("resources/image-textures/track_other_bg_right.png");
 
 	trackbg_img = load_img("resources/image-textures/trackbg.png");
-
+	
+	key_cf_img = load_img("resources/image-textures/key_cf.png");
+	key_dga_img = load_img("resources/image-textures/key_dga.png");
+	key_eb_img = load_img("resources/image-textures/key_eb.png");
+	key_black_img = load_img("resources/image-textures/key_black.png");
+	key_cf_pressed_img = load_img("resources/image-textures/key_cf_pressed.png");
+	key_dga_pressed_img = load_img("resources/image-textures/key_dga_pressed.png");
+	key_eb_pressed_img = load_img("resources/image-textures/key_eb_pressed.png");
+	key_black_pressed_img = load_img("resources/image-textures/key_black_pressed.png");
 
 }
 
@@ -437,7 +470,9 @@ void draw(void) {
 	VIEW_EXTENTS[0] = 0;
 	VIEW_EXTENTS[1] = width; //for now, at least
 	if (PLAYMODE==STAGE) {
-		draw_img(0.0f,vbarloc,width,height-vbarloc, stageimg.tex);
+		float w = stageimg.width*(max(width/stageimg.width, height/stageimg.height));
+		float h = stageimg.height*(max(width/stageimg.width, height/stageimg.height));
+		draw_img(0.0f,vbarloc,w,h,stageimg.tex);
 	}
 	draw_img(0,vbarloc-barimg.height,width,barimg.height,barimg.tex);
 	float controlheight = vbarloc-(barimg.height/2+play_img.height/2);
@@ -483,6 +518,117 @@ void draw(void) {
 	/*------------------------------*/
 	
 	glutSwapBuffers();
+}
+
+void mouse_press(int x, int y, int button, int modifiers) {
+	float ch = vbarloc-(barimg.height/2+play_img.height/2);
+	float cx = width/2;
+	if (y>vbarloc and PLAYMODE==KEYBOARD){
+		float keyscale = max((height-vbarloc)/(key_cf_img.height*1.0),0.25);
+		int noteval = max(min((int)(x/(key_cf_img.width*keyscale)*12/7.0)+36,87),1);
+		if (y<vbarloc+256*keyscale) {
+			int rem = noteval%12;
+			if (rem==1 || rem==3 || rem==6 || rem==8 || rem==10){
+				noteval-=(int)((int)((x+31)/(key_cf_img.width*keyscale)*12/7.0)+36==noteval)*2-1;
+			}
+		}
+		KEYPRESS_MASK[noteval]=true;
+		(*ACTIVETRACK).play_note(noteval,1); //remember, this is a pointer
+		return;
+	}
+	if (max(cx-100,(float)width/3)<x and x<max(cx-100,(float)width/3)+record_img.width 
+		and vbarloc-(barimg.height/2+record_img.height/2)<y and y<vbarloc-(barimg.height/2)+record_img.height/2){
+		if (recording){
+			recording = false;
+		} else {
+			if (!playing) {
+				playing = true;
+			}
+			recording = true;
+			(*ACTIVETRACK).add(Subtrack());
+		}
+		return;
+	}
+	if (cx<x and x<cx+rw_beg_img.width and ch<y and y<ch+rw_beg_img.height){
+		INDEX = 0;
+		return;
+	}
+	cx+=rw_beg_img.width;
+	if (cx<x and x<cx+rw_img.width and ch<y and y<ch+rw_img.height){
+		INDEX-=1;
+		INDEX = INDEX-INDEX%STEP;
+		return;
+	}
+	cx+=rw_img.width;
+	if (playing) {
+		if (cx<x and x<cx+pause_img.width and ch<y and y<ch+pause_img.height){
+			playing = false;
+			recording = false;
+			return;
+		}
+		cx+=pause_img.width;
+	} else {
+		if (cx<x and x<cx+play_img.width and ch<y and y<ch+play_img.height){
+			playing = true;
+			return;
+		}
+		cx+=play_img.width;
+	}
+	if (cx<x and x<cx+ff_img.width and ch<y and y<ch+ff_img.height){
+		INDEX = INDEX-INDEX%STEP+STEP;
+		return;
+	}
+	cx+=ff_img.width;
+	if (cx<x and x<cx+ff_end_img.width and ch<y and y<ch+ff_end_img.height){
+		//TODO: define this
+		//fast_forward_end();
+		return;
+	}
+	if (VIEW_SCALE*64+154<x and x<VIEW_SCALE*64+162 and 4<y and y<12){
+		dragging_scale = true;
+		return;
+	}
+	if (vbarloc-barimg.height<y and y<vbarloc) {
+		dragging_vbar = true;
+	} else {
+		//
+	}
+}
+
+void mouse_drag(int x, int y, int dx, int dy, int button, int modifiers) {
+	if (dragging_vbar){
+		vbarloc=max(min(vbarloc+dy,(float)height),(float)(barimg.height));
+	} else if (dragging_scale){
+		VIEW_SCALE = (x-154)/64.0;
+	} else if (y>vbarloc){// and PLAYMODE==KEYBOARD){
+		float keyscale = max((height-vbarloc)/(key_cf_img.height*1.0),0.125);
+		int noteval = max(min(int(x/(key_cf_img.width*keyscale)*12/7.0)+36,88),0);
+		if (y<vbarloc+256*keyscale){
+			int rem = noteval%12;
+			if (rem==1 || rem==3 || rem==6 || rem==8 || rem==10){
+				noteval-=(int)((int)((x+31)/(key_cf_img.width*keyscale)*12/7.0)+36==noteval)*2-1;
+			}
+		}
+		if (!KEYPRESS_MASK[noteval]) {
+			for (uint8_t i=0; i<len(KEYPRESS_MASK); i++){
+				(*ACTIVETRACK).stop_note(i);
+			}
+			//clear the mask - can't figure out how to make this a function
+			// (can you not pass a pointer to an array as an argument?)
+			for (uint16_t i=0; i<len(KEYPRESS_MASK); i++){ KEYPRESS_MASK[i]=0; }
+			KEYPRESS_MASK[noteval] = true;
+			(*ACTIVETRACK).play_note(noteval,1);
+		}
+		return;
+	}
+}
+void mouse_release(int x, int y, int button, int modifiers) {
+	dragging_vbar = false;
+	for (uint8_t i=0; i<len(KEYPRESS_MASK); i++) {
+		(*ACTIVETRACK).stop_note(i);
+	}
+	for (uint16_t i=0; i<len(KEYPRESS_MASK); i++){ KEYPRESS_MASK[i]=0; }
+	dragging_scale = false;
 }
 
 void processNormalKeys(unsigned char key, int x, int y) {
@@ -538,6 +684,24 @@ void changeSize(int w, int h) {
 	glutPostRedisplay();*/
 }
 
+static void mouse(int button, int state, int x, int y) {
+	if (state == GLUT_DOWN) {
+		mouse_press(x, height-y, button, glutGetModifiers());
+	} else if (state == GLUT_UP) {
+		mouse_release(x, height-y, button, glutGetModifiers());
+	}
+	lastx = x;
+	lasty = y;
+	//draw();
+}
+static void drag(int x, int y) {
+	//TODO: dynamically set the button if rught-click drags are possible
+	mouse_drag(x, height-y, x-lastx, lasty-y, GLUT_LEFT_BUTTON, glutGetModifiers());
+	lastx = x;
+	lasty = y;
+	//draw();
+}
+
 int main(int argc, char **argv) {
 
 	// init tracks
@@ -557,9 +721,11 @@ int main(int argc, char **argv) {
 	// register callbacks
 	glutDisplayFunc(draw);
 	glutReshapeFunc(changeSize);
-	//glutIdleFunc(draw);
+	glutIdleFunc(draw);
 	glutKeyboardFunc(processNormalKeys);
 	glutSpecialFunc(processSpecialKeys);
+	glutMotionFunc(&drag);
+    glutMouseFunc(&mouse);
 
 	// enter GLUT event processing cycle
 	glutMainLoop();
