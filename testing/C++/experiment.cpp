@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <vector>
 #include <algorithm>
 #include <GL/glew.h>
 //#include <SOIL.h>
@@ -192,6 +193,27 @@ Img ff_end_img;
 
 Img slider_img;
 
+Img tsa_img;
+Img tra_img;
+Img tla_img;
+Img toa_img;
+Img tg_img;
+
+Img tbg_s_img;
+Img tbg_s_l_img;
+Img tbg_s_r_img;
+Img tbg_r_img;
+Img tbg_r_l_img;
+Img tbg_r_r_img;
+Img tbg_l_img;
+Img tbg_l_l_img;
+Img tbg_l_r_img;
+Img tbg_o_img;
+Img tbg_o_l_img;
+Img tbg_o_r_img;
+
+Img trackbg_img;
+
 float vbarloc = 100;
 bool dragging_vbar = false;
 bool dragging_scale = false;
@@ -203,15 +225,47 @@ float PLAYBACK_SPEED = 16.0;
 int STAGE = 57; // 'ST'
 int KEYBOARD = 80; // 'BO' - can't really do 'K'!
 int PLAYMODE = STAGE; // use STAGE or KEYBOARD
-/*KEYPRESS_MASK = []
-NOTE_RATIOS = [1,1.059,1.122,1.189,1.26,1.334,1.4142,1.498,1.587,1.682,1.7818,1.887]
-KEYMAP = {key.A:36,key.W:37,key.S:38,key.E:39,key.D:40,key.F:41,key.T:42,
+bool KEYPRESS_MASK [88] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+							0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+							0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+							0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+float NOTE_RATIOS [] = {1,1.059,1.122,1.189,1.26,1.334,1.4142,1.498,1.587,1.682,1.7818,1.887};
+int VIEW_EXTENTS [2];
+/*KEYMAP = {key.A:36,key.W:37,key.S:38,key.E:39,key.D:40,key.F:41,key.T:42,
 			key.G:43,key.Y:44,key.H:45,key.U:46,key.J:47,key.K:48,
 			key.O:49,key.L:50,key.P:51,key.SEMICOLON:52,key.APOSTROPHE:53}*/
 bool playing = false;
 bool recording = false;
 float pitchbend = 1.0;
+int SIDE_WIDTH = 150;
 
+class Subtrack {
+	public:
+		bool is_silence() { return true; };
+		int __len__() {/*return data.size()*/return 30;};
+};
+
+class Track {
+	private:
+		Img * int_img;
+	public:
+		Img * cimg;
+		Img * leftimg;
+		Img * rightimg;
+		Track();
+		vector<Subtrack> tracks;
+		Img img() {
+			return *int_img;
+		};
+};
+Track::Track () {
+  int_img = &tsa_img;
+  cimg = &tbg_s_img;
+  leftimg = &tbg_s_l_img;
+  rightimg = &tbg_s_r_img;
+}
+
+vector<Track> TRACKS;
 
 void load_all_images() {
 	stageimg = load_img("resources/image-textures/floor.png");
@@ -226,7 +280,63 @@ void load_all_images() {
 	ff_end_img = load_img("resources/image-textures/forward_to_end.png");
 
 	slider_img = load_img("resources/image-textures/slider.png");
+	
+
+	tsa_img = load_img("resources/image-textures/track_software_active.png");
+	tra_img = load_img("resources/image-textures/track_real_active.png");
+	tla_img = load_img("resources/image-textures/track_loop_active.png");
+	toa_img = load_img("resources/image-textures/track_other_active.png");
+	tg_img = load_img("resources/image-textures/track_generic.png");
+
+	tbg_s_img = load_img("resources/image-textures/track_software_bg.png");
+	tbg_s_l_img = load_img("resources/image-textures/track_software_bg_left.png");
+	tbg_s_r_img = load_img("resources/image-textures/track_software_bg_right.png");
+	tbg_r_img = load_img("resources/image-textures/track_real_bg.png");
+	tbg_r_l_img = load_img("resources/image-textures/track_real_bg_left.png");
+	tbg_r_r_img = load_img("resources/image-textures/track_real_bg_right.png");
+	tbg_l_img = load_img("resources/image-textures/track_loop_bg.png");
+	tbg_l_l_img = load_img("resources/image-textures/track_loop_bg_left.png");
+	tbg_l_r_img = load_img("resources/image-textures/track_loop_bg_right.png");
+	tbg_o_img = load_img("resources/image-textures/track_other_bg.png");
+	tbg_o_l_img = load_img("resources/image-textures/track_other_bg_left.png");
+	tbg_o_r_img = load_img("resources/image-textures/track_other_bg_right.png");
+
+	trackbg_img = load_img("resources/image-textures/trackbg.png");
+
+
 }
+
+void draw_track(Track track, int num, int width) {
+	float BASE_HEIGHT=(vbarloc-barimg.height)-((num+1)*track.img().height);
+	trackbg_img.blit(0,BASE_HEIGHT,width);
+	for (int i=VIEW_EXTENTS[0]; i<VIEW_EXTENTS[1]; i++){
+		if (i%STEP==0){
+			draw_rect((i-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+4,1,tsa_img.height-4,0.33,0.33,0.33);
+		}
+	};
+	int track_index;
+	track_index = 0;
+	int time_index;
+	time_index = 0;
+	for (uint16_t q=0; q<track.tracks.size(); q++) {
+		Subtrack i = track.tracks[q];
+		if (!i.is_silence()){
+			//pass
+			//print time_index
+			(*track.leftimg).blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+4);
+			(*track.cimg).blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+5,BASE_HEIGHT+4,i.__len__()*VIEW_SCALE-8);
+			(*track.rightimg).blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+i.__len__()*VIEW_SCALE-4,BASE_HEIGHT+4);
+			/*for j in xrange(len(i.data)):
+				if i.data[j]:
+					for [k,l,m] in i.data[j]:
+						rgb084084084.blit((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+8+k%28,width=m*VIEW_SCALE)
+					}
+				}
+			}*/
+		}
+	}
+}
+
 
 void draw(void) {
 
@@ -243,7 +353,8 @@ void draw(void) {
 	gluOrtho2D(0, width, 0, height);
 	glMatrixMode(GL_MODELVIEW);
 	
-	//draw_rect(200,200,50,100,red,green,blue);
+	VIEW_EXTENTS[0] = 0;
+	VIEW_EXTENTS[1] = width; //for now, at least
 	if (PLAYMODE==STAGE) {
 		draw_img(0.0f,vbarloc,width,height-vbarloc, stageimg.tex);
 	}
@@ -276,8 +387,9 @@ void draw(void) {
 	/*---------- Tracks ------------*/
 	draw_rect(0,0,width,vbarloc-barimg.height,0.75f,0.75f,0.75f);
 	//rgb184184184.blit(0,0,width=width,height=vbarloc-barimg.height)
-	//for i in xrange(len(TRACKS)):
-	//	draw_track(TRACKS[i],i,width)
+	for (uint32_t i=0; i<TRACKS.size();i++){
+		draw_track(TRACKS[i],i,width);
+	}
 	//rgb084084084.blit(150,0,height=vbarloc-barimg.height)
 	//rgb255000000.blit(151+(INDEX-SCROLL)*VIEW_SCALE,0,height=vbarloc-barimg.height)
 	//rgb237237237.blit(151,0,width=width-150,height=16)
@@ -342,6 +454,9 @@ void changeSize(int w, int h) {
 }
 
 int main(int argc, char **argv) {
+
+	// init tracks
+	TRACKS.push_back(Track());
 
 	// init GLUT and create window
 	glutInit(&argc, argv);
