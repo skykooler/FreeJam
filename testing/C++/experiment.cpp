@@ -64,6 +64,32 @@ void draw_rect(float x, float y, float w, float h, float r, float g, float b) {
 	glEnd();
 }
 
+// Here are the fonts: 
+GLvoid * glutFonts[7] = { 
+    GLUT_BITMAP_9_BY_15, 
+    GLUT_BITMAP_8_BY_13, 
+    GLUT_BITMAP_TIMES_ROMAN_10, 
+    GLUT_BITMAP_TIMES_ROMAN_24, 
+    GLUT_BITMAP_HELVETICA_10, 
+    GLUT_BITMAP_HELVETICA_12, 
+    GLUT_BITMAP_HELVETICA_18 
+}; 
+
+// Here is the function 
+void glutPrint(float x, float y, GLvoid *font, char* text, float r, float g, float b, float a) 
+{ 
+    if(!text || !strlen(text)) return; 
+    bool blending = false; 
+    if(glIsEnabled(GL_BLEND)) blending = true; 
+    glEnable(GL_BLEND); 
+    glColor4f(r,g,b,a); 
+    glRasterPos2f(x,y); 
+    while (*text) { 
+        glutBitmapCharacter(font, *text); 
+        text++; 
+    } 
+    if(!blending) glDisable(GL_BLEND); 
+}  
 
 class Img {
 	public:
@@ -239,19 +265,50 @@ bool recording = false;
 float pitchbend = 1.0;
 int SIDE_WIDTH = 150;
 
+class Label {
+	public:
+		float x;
+		float y;
+		char * text;
+		GLvoid *font;
+		int font_size;
+		float r;
+		float g;
+		float b;
+		float a;
+		void draw () {
+			glutPrint(x, y, glutFonts[5], text, r, g, b, a);
+		}
+		Label();
+};
+Label::Label(){
+	font = GLUT_BITMAP_TIMES_ROMAN_24;
+	font_size = 12;
+	r = 0.0;
+	g = 0.0;
+	b = 0.0;
+	a = 0.5;
+	text = (char *)"Mana oh mana";
+}
+
 class Subtrack {
+	private:
+		vector<int[3]> data;
 	public:
 		bool is_silence() { return true; };
-		int __len__() {/*return data.size()*/return 30;};
+		int __len__() {return data.size();/*return 30;*/};
 };
 
 class Track {
 	private:
 		Img * int_img;
+		char * name;
 	public:
 		Img * cimg;
 		Img * leftimg;
 		Img * rightimg;
+		Label label;
+		Label labelshadow;
 		Track();
 		vector<Subtrack> tracks;
 		Img img() {
@@ -263,6 +320,13 @@ Track::Track () {
   cimg = &tbg_s_img;
   leftimg = &tbg_s_l_img;
   rightimg = &tbg_s_r_img;
+  label.r = 1.0;
+  label.g = 1.0;
+  label.b = 1.0;
+  label.a = 1.0;
+  name = (char *)"Untitled Track";
+  label.text = name;
+  labelshadow.text = name;
 }
 
 vector<Track> TRACKS;
@@ -335,6 +399,13 @@ void draw_track(Track track, int num, int width) {
 			}*/
 		}
 	}
+	track.img().blit(0,BASE_HEIGHT,SIDE_WIDTH,track.img().height);
+	track.labelshadow.x = 15;
+	track.labelshadow.y = (vbarloc-barimg.height)-(num*track.img().height+track.label.font_size)-2;
+	track.label.x = 16;
+	track.label.y = (vbarloc-barimg.height)-(num*track.img().height+track.label.font_size)-3;
+	track.labelshadow.draw();
+	track.label.draw();
 }
 
 
