@@ -5,6 +5,7 @@
 #include <GL/glew.h>
 //#include <SOIL.h>
 #include <assert.h>
+#include <math.h>
 #include "png.h"
 #include <boost/thread.hpp>
 #include <boost/interprocess/sync/named_mutex.hpp>
@@ -268,6 +269,15 @@ int SIDE_WIDTH = 150;
 int lastx = 0;
 int lasty = 0;
 
+float note(int val) {
+	val-=36;
+	if (0<=val and val<12) {
+		return NOTE_RATIOS[val];
+	} else {
+		return (pow(2,(int)(val)/12))*NOTE_RATIOS[val%12];
+	}
+}
+
 class Label {
 	public:
 		float x;
@@ -294,6 +304,23 @@ Label::Label(){
 	text = (char *)"Mana oh mana";
 }
 
+class NotePlayer {
+	public:
+		void play_note(int noteval,float volume) {
+			/*self.notes[noteval].stop()
+			self.notes[noteval].play()
+			self.acnotes[noteval] = true
+			if (self.fadein) {
+				fadein_note(None,self.notes,noteval,self.acnotes,self.fadein,velocity)
+			} else {
+				self.notes[noteval].volume = velocity
+			}*/
+		};
+		void stop_note(int noteval) {
+			
+		};
+};
+
 class Silence {
 	int n;
 	
@@ -309,9 +336,33 @@ void Silence::play() {
 
 class Subtrack {
 	public:
-		vector<vector<int[3]> > data;
-		bool is_silence() { return true; };
+		//vector<vector<int[3]> > data;
+		vector<vector<int> > data;
+		bool is_silence() { return false; };
 		int __len__() {return data.size();/*return 30;*/};
+		void play(int INDEX, NotePlayer * player) {
+			(*player).play_note(35,1.0);
+			if (recording) {
+				vector<int> datum(3);
+				data[data.size()-1].push_back(datum);
+				//self.recnotes[noteval]=[data[-1],len(data)]
+			}
+			/*if self.data[index]:
+				for [i,j,k] in self.data[index]:
+					#player = pyglet.media.ManagedSoundPlayer()
+					#player.queue(c)
+					#player.pitch = note(i)
+					#player.play()
+					self.track.notes[i].stop()
+					self.track.notes[i].play()
+					self.track.acnotes[i] = True
+					if self.track.fadein:
+						fadein_note(None,self.track.notes,i,self.track.acnotes,self.track.fadein,j)
+					else:
+						self.track.notes[i].volume = j
+					pyglet.clock.schedule_once(self.stop_note,k,i)
+			return (index==len(self.data)-1)*/
+		}
 };
 
 /*Multiline comment for code folding to preserve line #s with Python
@@ -344,23 +395,31 @@ class Track {
 		Label label;
 		Label labelshadow;
 		Track();
+		NotePlayer player;
 		vector<Subtrack> tracks;
 		vector<int> trackslen;
 		Img img() {
 			return *int_img;
 		};
 		void play_note(int noteval,float volume) {
-		
+			player.play_note(noteval, volume);
 		};
 		void stop_note(int noteval) {
-			
+			player.stop_note(noteval);
 		};
 		void add(Subtrack subtrack) {
 			tracks.push_back(subtrack);
 			trackslen.push_back(subtrack.__len__());
 		};
 		void play(int INDEX) {
-			
+			int b = 0;
+			for (uint16_t i=0; i<tracks.size(); i++) {
+				if (INDEX-b<=tracks[i].__len__()) {
+					tracks[i].play(INDEX-b, &player);
+				} else {
+					b+=tracks[i].__len__();
+				}
+			}
 		};
 };
 Track::Track () {
@@ -547,8 +606,6 @@ void draw_track(Track track, int num, int width) {
 	for (uint16_t q=0; q<track.tracks.size(); q++) {
 		Subtrack i = track.tracks[q];
 		if (!i.is_silence()){
-			//pass
-			//print time_index
 			(*track.leftimg).blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+4);
 			(*track.cimg).blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+5,BASE_HEIGHT+4,i.__len__()*VIEW_SCALE-8);
 			(*track.rightimg).blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+i.__len__()*VIEW_SCALE-4,BASE_HEIGHT+4);
@@ -556,9 +613,9 @@ void draw_track(Track track, int num, int width) {
 				if (!(i.data[j].size()==0)){
 					//I think it is safe to make this 8 bits. There's only 88 possible keys.
 					for (uint8_t r=0; r<i.data[j].size(); r++) {
-						int k = *i.data[j][0];
+						int k = i.data[j][0];
 						//int l = *i.data[j][1];
-						int m = *i.data[j][2];
+						int m = i.data[j][2];
 						draw_rect((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+8+k%28,m*VIEW_SCALE,1,0.33,0.33,0.33);
 					}
 				}

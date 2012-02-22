@@ -191,6 +191,13 @@ recording = False
 pitchbend = 1.0
 ############################
 
+def note(val):
+	val-=36
+	if 0<=val<12:
+		return NOTE_RATIOS[val]
+	else:
+		return (2**(int(val)/12))*NOTE_RATIOS[val%12]
+
 '''
 
 
@@ -831,13 +838,6 @@ clock.set_fps_limit(128)
 #clock.schedule_interval_soft(draw,0.0625)
 
 c = pyglet.resource.media('c.wav', streaming=False)
-
-def note(val):
-	val-=36
-	if 0<=val<12:
-		return NOTE_RATIOS[val]
-	else:
-		return (2**(int(val)/12))*NOTE_RATIOS[val%12]
 
 
 
