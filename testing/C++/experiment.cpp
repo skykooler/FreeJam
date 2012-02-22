@@ -33,8 +33,8 @@ void silence::play() {
 
 
 void draw_img(float x, float y, float w, float h, GLuint tex) {
-	//glColor3f(0.0,0.0,0.5);
-	//glEnable(GL_TEXTURE_2D);
+	glColor3f(1.0,1.0,1.0);
+	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glBegin(GL_QUADS);
 		glTexCoord2f(0.0f, 0.0f);
@@ -50,6 +50,7 @@ void draw_img(float x, float y, float w, float h, GLuint tex) {
 
 void draw_rect(float x, float y, float w, float h, float r, float g, float b) {
 	glColor3f(r,g,b);
+	glDisable(GL_TEXTURE_2D);
 	glBegin(GL_QUADS);
 		glTexCoord2f(0.0f, 1.0f);
 		glVertex2f( x, y);
@@ -239,7 +240,7 @@ void draw(void) {
 	//			0.0f, 0.0f,  0.0f,
 	//			0.0f, 1.0f,  0.0f);
 				
-	gluOrtho2D(0, 1024, 0, 600);
+	gluOrtho2D(0, width, 0, height);
 	glMatrixMode(GL_MODELVIEW);
 	
 	//draw_rect(200,200,50,100,red,green,blue);
@@ -329,15 +330,15 @@ void changeSize(int w, int h) {
         // Reset Matrix
 	glLoadIdentity();
 
-	// Set the viewport to be the entire window
+	// Set the viewport to be the entire window*/
 	glViewport(0, 0, w, h);
 
-	// Set the correct perspective.
+	/*// Set the correct perspective.
 	gluPerspective(45,ratio,1,1000);
 
 	// Get Back to the Modelview
-	glMatrixMode(GL_MODELVIEW); */
-	glutPostRedisplay();
+	glMatrixMode(GL_MODELVIEW); 
+	glutPostRedisplay();*/
 }
 
 int main(int argc, char **argv) {
