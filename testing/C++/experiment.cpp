@@ -344,7 +344,11 @@ class Subtrack {
 			(*player).play_note(35,1.0);
 			if (recording) {
 				vector<int> datum(3);
-				data[data.size()-1].push_back(datum);
+				//data[data.size()-1].push_back(datum);
+				data[data.size()].resize(data[data.size()].size()+1);
+				data[data.size()].at(0) = 35;
+				data[data.size()].at(1) = 255;
+				data[data.size()].at(2) = 0;
 				//self.recnotes[noteval]=[data[-1],len(data)]
 			}
 			/*if self.data[index]:
