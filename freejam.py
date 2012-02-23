@@ -5,7 +5,14 @@ import os
 
 import pyglet
 
-import audiere
+try:
+	import audiere
+except ImportError:
+	try:
+		import medussa as audiere
+	except ImportError:
+		print "Could not import an audio library! Dividing by zero!"
+		x = 0/0
 
 from pyglet import clock
 
@@ -18,6 +25,62 @@ import math
 import rtmidi
 
 import xml.etree.ElementTree as etree
+
+def xml_to_dict(el):
+  d={}
+  if el.text:
+    d[el.tag] = el.text
+  else:
+    d[el.tag] = {}
+  children = el.getchildren()
+  def setd(key, val, e):
+    e[key] = val
+  if children:
+    print map(xml_to_dict,children)
+    d[el.tag] = dict([[i.keys()[0],i[i.keys()[0]]] for i in map(xml_to_dict, children)])
+  return d
+  
+def strip_whitespace(list):
+	for i in xrange(len(list)):
+		if type(list[i])==str and list[i].strip()=='':
+			del list[i]
+  
+def xml_to_dictionary(element):
+    namespace = ''
+    l = len(namespace)
+    dictionary={}
+    tag = element.tag[l:]
+    if element.text:
+        if (element.text == ' '):
+            dictionary[tag] = {}
+        else:
+            dictionary[tag] = element.text
+    children = element.getchildren()
+    if children:
+        subdictionary = {}
+        for child in children:
+            for k,v in xml_to_dictionary(child).items():
+                if k in subdictionary:
+                    if ( isinstance(subdictionary[k], list)):
+                        subdictionary[k].append(v)
+                    else:
+                        subdictionary[k] = [subdictionary[k], v]
+                else:
+                    subdictionary[k] = v
+        if (dictionary[tag] == {}):
+            dictionary[tag] = subdictionary
+        else:
+            dictionary[tag] = [dictionary[tag], subdictionary]
+    if element.attrib:
+        attribs = {}
+        for k,v in element.attrib.items():
+            attribs[k] = v
+        if (dictionary[tag] == {}):
+            dictionary[tag] = attribs
+        else:
+            dictionary[tag] = [dictionary[tag], attribs]
+    return dictionary
+
 
 audio = audiere.open_device()
 
@@ -446,61 +509,6 @@ stagesprite = pyglet.sprite.Sprite(stageimg)
 
 pyglet.resource.path = ['instruments/keyboards/piano1']
 pyglet.resource.reindex()
-
-def xml_to_dict(el):
-  d={}
-  if el.text:
-    d[el.tag] = el.text
-  else:
-    d[el.tag] = {}
-  children = el.getchildren()
-  def setd(key, val, e):
-    e[key] = val
-  if children:
-    print map(xml_to_dict,children)
-    d[el.tag] = dict([[i.keys()[0],i[i.keys()[0]]] for i in map(xml_to_dict, children)])
-  return d
-  
-def strip_whitespace(list):
-	for i in xrange(len(list)):
-		if type(list[i])==str and list[i].strip()=='':
-			del list[i]
-  
-def xml_to_dictionary(element):
-    namespace = ''
-    l = len(namespace)
-    dictionary={}
-    tag = element.tag[l:]
-    if element.text:
-        if (element.text == ' '):
-            dictionary[tag] = {}
-        else:
-            dictionary[tag] = element.text
-    children = element.getchildren()
-    if children:
-        subdictionary = {}
-        for child in children:
-            for k,v in xml_to_dictionary(child).items():
-                if k in subdictionary:
-                    if ( isinstance(subdictionary[k], list)):
-                        subdictionary[k].append(v)
-                    else:
-                        subdictionary[k] = [subdictionary[k], v]
-                else:
-                    subdictionary[k] = v
-        if (dictionary[tag] == {}):
-            dictionary[tag] = subdictionary
-        else:
-            dictionary[tag] = [dictionary[tag], subdictionary]
-    if element.attrib:
-        attribs = {}
-        for k,v in element.attrib.items():
-            attribs[k] = v
-        if (dictionary[tag] == {}):
-            dictionary[tag] = attribs
-        else:
-            dictionary[tag] = [dictionary[tag], attribs]
-    return dictionary
 
 def draw(*args):
 	#Dummy function to redraw the window

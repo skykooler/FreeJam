@@ -1,1 +1,3 @@
 Currently only the sound engine; GUI to come.
+
+You need libasound-dev to install PyRTMidi on linux.
