@@ -1,0 +1,25 @@
+Header
+	...
+File Info
+	File Version bytes (00,00 to start)
+Tracks information
+	Initializer (2 bytes, 0x5453 - 'TS')
+	Number of tracks (1 byte)
+	Track information
+		Initializer (2 bytes, 0x5452 - 'TR')
+		Length of tracks (4 bytes)
+		Volume header (1 byte, 0x56 - 'V')
+		Volume data ($length bytes)
+		Pan header (1 byte, 0x50 - 'P')
+		Pan data ($length bytes)
+		Subtrack header (1 byte, 0x53 - 'S')
+		Number of subtracks (2 bytes)
+		Subtrack information
+			Initializer (2 bytes, 0x5342 - 'SB')
+			Length of data (3 bytes)
+			Silence or track? (1 byte - 0x00 or 0xFF)
+			If not silence:
+			Pitch bend header (1 byte, 0x42 - 'B')
+			Pitch bend data ($length bytes)
+			Note header (1 byte, 0x4E - 'N')
+			Note data 

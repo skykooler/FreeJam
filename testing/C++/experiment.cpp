@@ -307,6 +307,20 @@ Label::Label(){
 class NotePlayer {
 	public:
 		void play_note(int noteval,float volume) {
+			printf("note=%i\n",noteval);
+			/*self.notes[noteval].stop()
+			self.notes[noteval].play()
+			self.acnotes[noteval] = true
+			if (self.fadein) {
+				fadein_note(None,self.notes,noteval,self.acnotes,self.fadein,velocity)
+			} else {
+				self.notes[noteval].volume = velocity
+			}*/
+		};
+		void play_note(int noteval,float volume,vector<int> * data) {
+			play_note(noteval,volume);
+			(*data).at(noteval) = 1;
+			(*data).at(noteval+88)=(int)(volume*255);
 			/*self.notes[noteval].stop()
 			self.notes[noteval].play()
 			self.acnotes[noteval] = true
@@ -334,18 +348,19 @@ void Silence::play() {
 	
 }
 
+
 class Subtrack {
 	public:
-		//vector<vector<int[3]> > data;
 		vector<vector<int> > data;
 		bool is_silence() { return false; };
 		int __len__() {return data.size();/*return 30;*/};
+		void add_data();
+		Subtrack();
 		void play(int INDEX, NotePlayer * player) {
-			(*player).play_note(35,1.0);
-			if (recording) {
-				vector<int> datum(3);
-				data[data.size()-1].push_back(datum);
-				//self.recnotes[noteval]=[data[-1],len(data)]
+			for (int i=0; i<88; i++) {
+				if (data.at(INDEX).at(i)==1){
+					(*player).play_note(i,1.0);
+				}
 			}
 			/*if self.data[index]:
 				for [i,j,k] in self.data[index]:
@@ -363,6 +378,16 @@ class Subtrack {
 					pyglet.clock.schedule_once(self.stop_note,k,i)
 			return (index==len(self.data)-1)*/
 		}
+};
+void Subtrack::add_data(){
+	vector<int> datum;
+	datum.resize(176);	//88*2
+	data.push_back(datum);
+};
+Subtrack::Subtrack(){
+	vector<int> datum;
+	datum.resize(176);	//88*2
+	data.push_back(datum);
 };
 
 /*Multiline comment for code folding to preserve line #s with Python
@@ -398,11 +423,19 @@ class Track {
 		NotePlayer player;
 		vector<Subtrack> tracks;
 		vector<int> trackslen;
+		Subtrack * currenttrack;
 		Img img() {
 			return *int_img;
 		};
 		void play_note(int noteval,float volume) {
-			player.play_note(noteval, volume);
+			if (recording) {
+				player.play_note(noteval,volume);
+				(*currenttrack).data.at(INDEX).at(noteval) = 1;
+				(*currenttrack).data.at(INDEX).at(noteval+88)=(int)(volume*255);
+			} else {
+				player.play_note(noteval,volume);
+			}
+			//player.play_note(noteval, volume);
 		};
 		void stop_note(int noteval) {
 			player.stop_note(noteval);
@@ -410,11 +443,13 @@ class Track {
 		void add(Subtrack subtrack) {
 			tracks.push_back(subtrack);
 			trackslen.push_back(subtrack.__len__());
+			currenttrack = &tracks.at(tracks.size()-1);
 		};
-		void play(int INDEX) {
+		//void play(int INDEX) {
+		void play() {
 			int b = 0;
 			for (uint16_t i=0; i<tracks.size(); i++) {
-				if (INDEX-b<=tracks[i].__len__()) {
+				if (INDEX-b<tracks[i].__len__()) {
 					tracks[i].play(INDEX-b, &player);
 				} else {
 					b+=tracks[i].__len__();
@@ -610,7 +645,7 @@ void draw_track(Track track, int num, int width) {
 			(*track.cimg).blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+5,BASE_HEIGHT+4,i.__len__()*VIEW_SCALE-8);
 			(*track.rightimg).blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+i.__len__()*VIEW_SCALE-4,BASE_HEIGHT+4);
 			for (uint32_t j=0; j<i.data.size(); j++) {
-				if (!(i.data[j].size()==0)){
+				/*if (!(i.data[j].size()==0)){
 					//I think it is safe to make this 8 bits. There's only 88 possible keys.
 					for (uint8_t r=0; r<i.data[j].size(); r++) {
 						int k = i.data[j][0];
@@ -618,7 +653,7 @@ void draw_track(Track track, int num, int width) {
 						int m = i.data[j][2];
 						draw_rect((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+8+k%28,m*VIEW_SCALE,1,0.33,0.33,0.33);
 					}
-				}
+				}*/
 			}
 		}
 		time_index+=i.__len__();
@@ -884,11 +919,12 @@ void on_key_release(int symbol, int modifiers){
 	}
 }
 
-static void play(int dummy) {
+void play(int dummy) {
 	if (playing){
 		for (uint8_t j=0; j<(TRACKS).size(); j++) {
 			Track * i = &(TRACKS)[j];
-			(*i).play(INDEX);
+			//(*i).play(INDEX);
+			(*i).play();
 		}
 		if (INDEX<256){	//TODO: calculate this value
 			INDEX+=1;
@@ -897,8 +933,7 @@ static void play(int dummy) {
 			recording = false;
 		}
 		if (recording) {
-			(*ACTIVETRACK).tracks[(*ACTIVETRACK).tracks.size()-1].data.resize((*ACTIVETRACK).tracks[(*ACTIVETRACK).tracks.size()-1].data.size()+1);
-			//(*ACTIVETRACK).tracks[(*ACTIVETRACK).tracks.size()-1].data.resize(100);
+			(*(*ACTIVETRACK).currenttrack).add_data();
 		}
 	}
 	glutTimerFunc (1000/PLAYBACK_SPEED, play, 0);
@@ -998,6 +1033,9 @@ int main(int argc, char **argv) {
 	// init tracks
 	TRACKS.push_back(Track());
 	ACTIVETRACK = &TRACKS[0];
+	
+	//init keys
+	init_keys();
 
 	// init GLUT and create window
 	glutInit(&argc, argv);
