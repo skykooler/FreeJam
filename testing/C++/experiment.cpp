@@ -357,22 +357,10 @@ class Subtrack {
 		void add_data();
 		Subtrack();
 		void play(int INDEX, NotePlayer * player) {
-<<<<<<< HEAD
 			for (int i=0; i<88; i++) {
 				if (data.at(INDEX).at(i)==1){
 					(*player).play_note(i,1.0);
 				}
-=======
-			(*player).play_note(35,1.0);
-			if (recording) {
-				vector<int> datum(3);
-				//data[data.size()-1].push_back(datum);
-				data[data.size()].resize(data[data.size()].size()+1);
-				data[data.size()].at(0) = 35;
-				data[data.size()].at(1) = 255;
-				data[data.size()].at(2) = 0;
-				//self.recnotes[noteval]=[data[-1],len(data)]
->>>>>>> 3add5f8af17fbbe59f4ff3289d072233cb03e3ac
 			}
 			/*if self.data[index]:
 				for [i,j,k] in self.data[index]:
@@ -863,7 +851,7 @@ void on_mouse_press(int x, int y, int button, int modifiers) {
 	}
 	if (VIEW_SCALE*64+154<x and x<VIEW_SCALE*64+162 and 4<y and y<12){
 		dragging_scale = true;
-		return;
+		return; 
 	}
 	if (vbarloc-barimg.height<y and y<vbarloc) {
 		dragging_vbar = true;
