@@ -438,7 +438,12 @@ class Track {
 			//player.play_note(noteval, volume);
 		};
 		void stop_note(int noteval) {
-			player.stop_note(noteval);
+			if (recording) {
+				player.stop_note(noteval);
+				(*currenttrack).data.at(INDEX).at(noteval) = 255;
+			} else {
+				player.stop_note(noteval);
+			}
 		};
 		void add(Subtrack subtrack) {
 			tracks.push_back(subtrack);
@@ -645,15 +650,22 @@ void draw_track(Track track, int num, int width) {
 			(*track.cimg).blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+5,BASE_HEIGHT+4,i.__len__()*VIEW_SCALE-8);
 			(*track.rightimg).blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+i.__len__()*VIEW_SCALE-4,BASE_HEIGHT+4);
 			for (uint32_t j=0; j<i.data.size(); j++) {
-				/*if (!(i.data[j].size()==0)){
-					//I think it is safe to make this 8 bits. There's only 88 possible keys.
+				if (!(i.data[j].size()==0)){
 					for (uint8_t r=0; r<i.data[j].size(); r++) {
-						int k = i.data[j][0];
-						//int l = *i.data[j][1];
-						int m = i.data[j][2];
-						draw_rect((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+8+k%28,m*VIEW_SCALE,1,0.33,0.33,0.33);
+						//1 indicates note-on, 255 indicates note-off
+						if (i.data[j][r]==1) {
+							//int vol = i.data[j][r+88];
+							int length = 0;
+							for (uint32_t k=j; k<i.data.size();k++) {
+								if (i.data[k][r]==255) {
+									break;
+								}
+								length++;
+							}
+							draw_rect((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+8+r%28,length*VIEW_SCALE,1,0.33,0.33,0.33);
+						}
 					}
-				}*/
+				}
 			}
 		}
 		time_index+=i.__len__();
