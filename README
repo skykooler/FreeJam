@@ -1,3 +1,8 @@
-Currently only the sound engine; GUI to come.
+FreeJam aims to provide an open-source alternative to GarageBand. It uses OpenGL for drawing.
+There are currently two versions of the code: a Python version and a C++ version. This is because
+there are a bunch of dependencies for the Python version which are difficult to install; also,
+the C++ version should give better performance when it it up to the same point (currently sound
+doesn't work yet).
+
 
 You need libasound-dev to install PyRTMidi on linux.
