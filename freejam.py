@@ -416,8 +416,8 @@ class Subtrack(object):
 	def __len__(self):
 		return len(self.data)
 	def __init__(self):
-		self.data = []
-	def play(self,index):
+		self.data = [[0]*176]
+	def play(self,index,player):
 		for i in xrange(88):
 			#player = pyglet.media.ManagedSoundPlayer()
 			#player.queue(c)
@@ -426,19 +426,22 @@ class Subtrack(object):
 			if self.data[index][i]==1:
 				j = self.data[index][i+88]
 				#k = self.data[index][i+176]
-				self.track.notes[i].stop()
+				player.play_note(i,j)
+				'''self.track.notes[i].stop()
 				self.track.notes[i].play()
 				self.track.acnotes[i] = True
 				if self.track.fadein:
 					fadein_note(None,self.track.notes,i,self.track.acnotes,self.track.fadein,j)
 				else:
-					self.track.notes[i].volume = j
+					self.track.notes[i].volume = j'''
 				#pyglet.clock.schedule_once(self.stop_note,k,i)
 		return (index==len(self.data)-1)
 	def is_silence(self):
 		return False
-	def stop_note(self,dt,noteval):
-		self.track.stop_note(noteval)
+	#def stop_note(self,dt,noteval):
+	#	self.track.stop_note(noteval)
+	def add_data(self):
+		self.data.append([0]*176)
 	
 class Track(object):
 	def __init__(self):
@@ -483,12 +486,13 @@ class Track(object):
 	def add(self,track):
 		self.tracks.append(track)
 		self.trackslen.append(len(track))
-		track.track = self
+		#track.track = self
+		self.currenttrack = track
 	def play(self,INDEX):
 		b = 0
 		for i in self.tracks:
 			if INDEX-b<len(i):
-				return i.play(INDEX-b)
+				return i.play(INDEX-b,self.player)
 			else:
 				b+=len(i)
 	def set_text(self,text):
@@ -585,8 +589,18 @@ def draw_track(track,num,width):
 			track.rightimg.blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+len(i)*VIEW_SCALE-4,BASE_HEIGHT+4)
 			for j in xrange(len(i.data)):
 				if i.data[j]:
-					for [k,l,m] in i.data[j]:
-						rgb084084084.blit((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+8+k%28,width=m*VIEW_SCALE)
+					#for [k,l,m] in i.data[j]:
+					#	rgb084084084.blit((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+8+k%28,width=m*VIEW_SCALE)
+					for r in xrange(len(i.data[j])):
+						#1 indicates note-on, 255 indicates note-off
+						if i.data[j][r]==1 :
+							length = 0;
+							for k in xrange(j, len(i.data)):
+								if i.data[k][r]==255:
+									break
+								length+=1
+							rgb084084084.blit((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+8+r%28,width=length*VIEW_SCALE)
+							#draw_rect((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,BASE_HEIGHT+8+r%28,length*VIEW_SCALE,1,0.33,0.33,0.33);
 		time_index+=len(i)
 		track_index+=1
 	track.img().blit(0,BASE_HEIGHT,width=SIDE_WIDTH,height=track.img().height)
@@ -758,7 +772,7 @@ def on_mouse_press(x, y, button, modifiers):
 				playing = True
 				#pyglet.clock.schedule_interval(play, 1/PLAYBACK_SPEED)
 			recording = True
-			ACTIVETRACK.add(subtrack())
+			ACTIVETRACK.add(Subtrack())
 		return None
 	if cx<x<cx+rw_beg_img.width and ch<y<ch+rw_beg_img.height:
 		global INDEX
@@ -888,7 +902,7 @@ def play(dt):
 			playing = False
 			recording = False
 	if recording:
-		ACTIVETRACK.tracks[-1].data.append([])
+		ACTIVETRACK.currenttrack.add_data()
 
 
 class input(threading.Thread):
