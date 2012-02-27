@@ -439,11 +439,9 @@ class Track {
 		};
 		void stop_note(int noteval) {
 			if (recording) {
-				player.stop_note(noteval);
 				(*currenttrack).data.at(INDEX).at(noteval) = 255;
-			} else {
-				player.stop_note(noteval);
 			}
+			player.stop_note(noteval);
 		};
 		void add(Subtrack subtrack) {
 			tracks.push_back(subtrack);

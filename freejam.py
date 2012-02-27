@@ -361,6 +361,43 @@ def note(val):
 
 
 '''
+
+class NotePlayer:
+	def __init__(self,continuous):
+		self.notes = []
+		self.continuous = continuous
+		self.fadein = False
+		for i in range(88):
+			#self.notes.append(audio.open_file('instruments/keyboards/piano1/c.wav'))
+			self.notes.append(audio.open_file('instruments/strings/basic strings/c.wav'))
+			self.notes[-1].pitchshift = note(i)
+			self.notes[-1].repeating = self.continuous
+			#if self.fadein:
+			#	self.notes[-1].volume = 0
+			#self.acnotes.append(False)
+			#self.recnotes.append(None)
+	def set_fadein(self):
+		self.fadein = True
+		for i in xrange(88):
+			self.notes[i].volume = 0
+	def play_note(self, noteval, volume):
+		self.notes[noteval].stop()
+		self.notes[noteval].play()
+		#self.acnotes[noteval] = True
+		if self.fadein:
+			#self.notes[noteval].volume = 0
+			#fadein_note(None,self.notes,noteval,self.acnotes,self.fadein,velocity)
+			fadein_note(None,self.notes,noteval,self.fadein,volume)
+		else:
+			self.notes[noteval].volume = velocity
+	def stop_note(self,noteval):
+		if self.cutoff:
+			#cutoff_note(None,self.notes,noteval,self.acnotes,self.cutoff)
+			cutoff_note(None,self.notes,noteval,self.cutoff)
+		else:
+			pass
+		
+
 class Silence(object):
 	def __getitem__(self,item):
 		return None
@@ -381,12 +418,14 @@ class Subtrack(object):
 	def __init__(self):
 		self.data = []
 	def play(self,index):
-		if self.data[index]:
-			for [i,j,k] in self.data[index]:
-				#player = pyglet.media.ManagedSoundPlayer()
-				#player.queue(c)
-				#player.pitch = note(i)
-				#player.play()
+		for i in xrange(88):
+			#player = pyglet.media.ManagedSoundPlayer()
+			#player.queue(c)
+			#player.pitch = note(i)
+			#player.play()
+			if self.data[index][i]==1:
+				j = self.data[index][i+88]
+				#k = self.data[index][i+176]
 				self.track.notes[i].stop()
 				self.track.notes[i].play()
 				self.track.acnotes[i] = True
@@ -394,7 +433,7 @@ class Subtrack(object):
 					fadein_note(None,self.track.notes,i,self.track.acnotes,self.track.fadein,j)
 				else:
 					self.track.notes[i].volume = j
-				pyglet.clock.schedule_once(self.stop_note,k,i)
+				#pyglet.clock.schedule_once(self.stop_note,k,i)
 		return (index==len(self.data)-1)
 	def is_silence(self):
 		return False
@@ -410,43 +449,35 @@ class Track(object):
 		#self.definition = xml_to_dict(etree.parse('instruments/keyboards/piano1/instrument.xml').getroot())['instrument']
 		self.definition = xml_to_dict(etree.parse('instruments/strings/basic strings/instrument.xml').getroot())['instrument']
 		try:
-			self.cutoff = int(self.definition['cutoff'])
+			self.player = NotePlayer(True if self.definition['continuous'].lower()=='yes' else False)
 		except:
-			self.cutoff = 100
+			self.player = NotePlayer(False)
 		try:
-			self.fadein = int(self.definition['fadein'])
+			self.player.cutoff = int(self.definition['cutoff'])
 		except:
-			self.fadein = 0
+			self.player.cutoff = 100
+		try:
+			if int(self.definition['fadein']):
+				self.player.set_fadein()
+		except:
+			pass # fadein is already False
 		try:
 			self.name = self.definition['name']
 		except:
 			self.name = 'Untitled instrument'
 		try:
-			self.continuous = True if self.definition['continuous'].lower()=='yes' else False
+			self.player.pitchbend = True if self.definition['pitchbend'].lower()=='yes' else False
 		except:
-			self.continuous = False
-		try:
-			self.pitchbend = True if self.definition['pitchbend'].lower()=='yes' else False
-		except:
-			self.pitchbend = False
+			self.player.pitchbend = False
 		self.label = pyglet.text.Label(self.name,font_name='Times New Roman',font_size=10)
 		self.labelshadow = pyglet.text.Label(self.name, font_name='Times New Roman', font_size=10, color=(0,0,0,255))
 		self.int_img = tsa_img
 		self.cimg = tbg_s_img
 		self.leftimg = tbg_s_l_img
 		self.rightimg = tbg_s_r_img
-		self.notes = []
-		self.acnotes = []
-		self.recnotes = []
-		for i in range(88):
-			#self.notes.append(audio.open_file('instruments/keyboards/piano1/c.wav'))
-			self.notes.append(audio.open_file('instruments/strings/basic strings/c.wav'))
-			self.notes[-1].pitchshift = note(i)
-			self.notes[-1].repeating = self.continuous
-			if self.fadein:
-				self.notes[-1].volume = 0
-			self.acnotes.append(False)
-			self.recnotes.append(None)
+		#self.acnotes = []
+		#self.recnotes = []
+		
 	def img(self):
 		return self.int_img if self==ACTIVETRACK else tg_img
 	def add(self,track):
@@ -463,26 +494,17 @@ class Track(object):
 	def set_text(self,text):
 		self.label.text = str(text)
 		self.labelshadow.text = str(text)
-	def play_note(self,noteval, velocity):
-		self.notes[noteval].stop()
-		self.notes[noteval].play()
-		self.acnotes[noteval] = True
-		if self.fadein:
-			#self.notes[noteval].volume = 0
-			fadein_note(None,self.notes,noteval,self.acnotes,self.fadein,velocity)
-		else:
-			self.notes[noteval].volume = velocity
+	def play_note(self,noteval, volume):
 		if recording:
-			self.tracks[-1].data[-1].append([noteval,velocity,1])
-			self.recnotes[noteval]=[self.tracks[-1].data[-1],len(self.tracks[-1].data)]
+			self.currenttrack.data[INDEX][noteval] = True
+			self.currenttrack.data[INDEX][noteval+88] = int(volume*255)
+			#self.recnotes[noteval]=[self.tracks[-1].data[-1],len(self.tracks[-1].data)]
+		self.player.play_note(noteval,volume)
 	def stop_note(self,noteval):
-		self.acnotes[noteval] = False
+		#self.acnotes[noteval] = False
 		if recording:
-			self.recnotes[noteval][0]=len(self.tracks[-1].data)-self.recnotes[noteval][1]
-		if self.cutoff:
-			cutoff_note(None,self.notes,noteval,self.acnotes,self.cutoff)
-		else:
-			pass
+			#self.recnotes[noteval][0]=len(self.tracks[-1].data)-self.recnotes[noteval][1]
+			self.currenttrack.data[INDEX][noteval] = 255
 	
 
 def log(message):
@@ -490,10 +512,10 @@ def log(message):
 
 
 track1 = Subtrack()
-track1.data = [[0.5,1],None,None,[0.561,1.122],[0.63,1.26],
-		[0.667,1.334],None,[0.7071,1.4142],[0.749,1.498],None]
+#track1.data = [[0.5,1],None,None,[0.561,1.122],[0.63,1.26],
+#		[0.667,1.334],None,[0.7071,1.4142],[0.749,1.498],None]
 track2 = Subtrack()
-track2.data = [None,None,[1.498,2,2.52,2.996],None,None,None,[2,2.52,2.996]]
+#track2.data = [None,None,[1.498,2,2.52,2.996],None,None,None,[2,2.52,2.996]]
 
 TRACKS = [Track(),Track()]
 ACTIVETRACK = TRACKS[0]
@@ -514,21 +536,25 @@ def draw(*args):
 	#Dummy function to redraw the window
 	pass
 	
-def cutoff_note(dt,notes,noteval,acnotes,cutoff):
+#def cutoff_note(dt,notes,noteval,acnotes,cutoff):
+def cutoff_note(dt,notes,noteval,cutoff):
 	#print note.volume
-	if not acnotes[noteval]:
+	#if not acnotes[noteval]:
 		if notes[noteval].volume>0:
 			notes[noteval].volume-=100.0/(20*cutoff)
-			pyglet.clock.schedule_once(cutoff_note,0.02,notes,noteval,acnotes,cutoff)
+			#pyglet.clock.schedule_once(cutoff_note,0.02,notes,noteval,acnotes,cutoff)
+			pyglet.clock.schedule_once(cutoff_note,0.02,notes,noteval,cutoff)
 		else:
 			notes[noteval].stop()
 			
-def fadein_note(dt,notes,noteval,acnotes,fadein,maxvol):
+#def fadein_note(dt,notes,noteval,acnotes,fadein,maxvol):
+def fadein_note(dt,notes,noteval,fadein,maxvol):
 	#print note.volume
-	if acnotes[noteval]:
+	#if acnotes[noteval]:
 		if notes[noteval].volume<maxvol:
 			notes[noteval].volume+=100.0/(20*fadein)
-			pyglet.clock.schedule_once(fadein_note,0.02,notes,noteval,acnotes,fadein,maxvol)
+			#pyglet.clock.schedule_once(fadein_note,0.02,notes,noteval,acnotes,fadein,maxvol)
+			pyglet.clock.schedule_once(fadein_note,0.02,notes,noteval,fadein,maxvol)
 	
 def play_note(noteval, velocity):
 	player = pyglet.media.ManagedSoundPlayer()
