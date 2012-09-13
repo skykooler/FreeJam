@@ -390,25 +390,7 @@ Subtrack::Subtrack(){
 	data.push_back(datum);
 };
 
-/*Multiline comment for code folding to preserve line #s with Python
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-*/
 class Track {
 	private:
 		Img * int_img;
@@ -478,49 +460,7 @@ Track::Track () {
   labelshadow.text = name;
 }
 
-/*
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-*/
 vector<Track> TRACKS;
 Track * ACTIVETRACK;
 
@@ -746,55 +686,7 @@ void on_draw(void) {
 	
 	glutSwapBuffers();
 }
-/*
 
- 
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-*/
 void on_mouse_press(int x, int y, int button, int modifiers) {
 	float ch = vbarloc-(barimg.height/2+play_img.height/2);
 	float cx = width/2;
@@ -869,10 +761,7 @@ void on_mouse_press(int x, int y, int button, int modifiers) {
 		//
 	}
 }
-/*
 
-
-*/
 void on_mouse_drag(int x, int y, int dx, int dy, int button, int modifiers) {
 	if (dragging_vbar){
 		vbarloc=max(min(vbarloc+dy,(float)height),(float)(barimg.height));
@@ -908,9 +797,7 @@ void on_mouse_release(int x, int y, int button, int modifiers) {
 	for (uint16_t i=0; i<len(KEYPRESS_MASK); i++){ KEYPRESS_MASK[i]=0; }
 	dragging_scale = false;
 }
-/*
 
-*/
 void on_key_press(int symbol, int modifiers) {
 	if ((bool)KEYMAP[symbol]){
 		int noteval = KEYMAP[symbol];
