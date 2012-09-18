@@ -7,6 +7,11 @@
 #include <assert.h>
 #include <math.h>
 #include "png.h"
+
+// Audio libraries
+#include "sndfile.h"
+#include "portaudio.h"
+
 #include <boost/thread.hpp>
 #include <boost/interprocess/sync/named_mutex.hpp>
 #include <boost/interprocess/sync/scoped_lock.hpp>
@@ -16,6 +21,11 @@
 #  include <GL/glut.h>
 #endif
 
+
+/*****************TODO************************/
+#define FILE_NAME "c.wav"
+/*********************************************/
+
 using namespace std;
 
 #define len(a) ( sizeof ( a ) / sizeof ( *a ) )
@@ -24,6 +34,65 @@ using namespace std;
 typedef unsigned char     uint8_t;
 typedef unsigned short    uint16_t;
 typedef unsigned int      uint32_t;
+
+/* Data structure to pass to callback includes the sound file, info about 
+the sound file, and a position cursor (where we are in the sound file) */
+struct SndData {
+  SNDFILE *sndFile;
+  SF_INFO sfInfo;
+  int position;
+};
+
+// Start sound system
+SndData *data = (SndData *)malloc(sizeof(SndData));
+PaStream *stream;
+PaError error;
+PaStreamParameters outputParameters;
+
+/*
+Callback function for audio output
+*/
+int Callback(const void *input,
+             void *output,
+             unsigned long frameCount,
+             const PaStreamCallbackTimeInfo* paTimeInfo,
+             PaStreamCallbackFlags statusFlags,
+             void *userData) {
+  SndData *data = (SndData *)userData; /* we passed a data structure into the callback so we have something to work with */
+  int *cursor; /* current pointer into the output  */
+  int *out = (int *)output;
+  int thisSize = frameCount;
+  int thisRead;
+
+  cursor = out; /* set the output cursor to the beginning */
+  while (thisSize > 0) {
+    /* seek to our current file position */
+    sf_seek(data->sndFile, data->position, SEEK_SET);
+
+    /* are we going to read past the end of the file?*/
+    if (thisSize > (data->sfInfo.frames - data->position)) {
+      /*if we are, only read to the end of the file*/
+      thisRead = data->sfInfo.frames - data->position;
+      /* and then loop to the beginning of the file */
+      data->position = 0;
+    } else {
+      /* otherwise, we'll just fill up the rest of the output buffer */
+      thisRead = thisSize;
+      /* and increment the file position */
+      data->position += thisRead;
+    }
+
+    /* since our output format and channel interleaving is the same as sf_readf_int's requirements */
+    /* we'll just read straight into the output buffer */
+    sf_readf_int(data->sndFile, cursor, thisRead);
+    /* increment the output cursor*/
+    cursor += thisRead;
+    /* decrement the number of samples left to process */
+    thisSize -= thisRead;
+  }
+
+  return paContinue;
+}
 
 void draw_img(float x, float y, float w, float h, GLuint tex) {
 	glColor3f(1.0,1.0,1.0);
@@ -307,6 +376,8 @@ Label::Label(){
 class NotePlayer {
 	public:
 		void play_note(int noteval,float volume) {
+
+			
 			printf("note=%i\n",noteval);
 			/*self.notes[noteval].stop()
 			self.notes[noteval].play()
@@ -959,6 +1030,45 @@ int main(int argc, char **argv) {
 	glutTimerFunc (1000/PLAYBACK_SPEED, play, 0);
 	//boost::thread playThread(boost::bind(play, &playing, &recording, 
 	//							&TRACKS, &ACTIVETRACK, &INDEX));
+
+
+	// Start sound system
+	/* initialize our data structure */
+	data->position = 0;
+	data->sfInfo.format = 0;
+	/* try to open the file */
+	data->sndFile = sf_open(FILE_NAME, SFM_READ, &data->sfInfo);
+	if (!data->sndFile) {
+	  printf("error opening file\n");
+	  return 1;
+	}
+	/* start portaudio */
+	Pa_Initialize();
+	  /* set the output parameters */
+	outputParameters.device = Pa_GetDefaultOutputDevice(); /* use the default device */
+	outputParameters.channelCount = data->sfInfo.channels; /* use the same number of channels as our sound file */
+	outputParameters.sampleFormat = paInt32; /* 32bit int format */
+	outputParameters.suggestedLatency = 0.01; /* 10 ms latency, if possible */
+	outputParameters.hostApiSpecificStreamInfo = 0; /* no api specific data */
+
+	/* try to open the output */
+	error = Pa_OpenStream(&stream,  /* stream is a 'token' that we need to save for future portaudio calls */
+	                    0,  /* no input */
+	                    &outputParameters,
+	                    data->sfInfo.samplerate,  /* use the same sample rate as the sound file */
+	                    paFramesPerBufferUnspecified,  /* let portaudio choose the buffersize */
+	                    paNoFlag,  /* no special modes (clip off, dither off) */
+	                    Callback,  /* callback function defined above */
+	                    data ); /* pass in our data structure so the callback knows what's up */
+
+	/* if we can't open it, then bail out */
+	if (error) {
+		printf("error opening output, error code = %i\n", error);
+		Pa_Terminate();
+		return 1;
+	}
+	Pa_StartStream(stream);
+
 
 	// enter GLUT event processing cycle
 	glutMainLoop();

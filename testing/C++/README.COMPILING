@@ -1,1 +1,3 @@
-gcc -o experiment experiment.cpp -I/usr/X11R6/include -L/usr/X11R6/lib -lGL -lGLEW -lglut -lGLU -lpng
+gcc -o experiment experiment.cpp -I/usr/X11R6/include -L/usr/X11R6/lib -lsndfile -lportaudio -lGL -lGLEW -lglut -lGLU -lpng
+
+g++ experiment.cpp -o experiment -lsndfile -lportaudio -lGL -lGLU -lglut -lpng
