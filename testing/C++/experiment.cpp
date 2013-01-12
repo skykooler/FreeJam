@@ -44,10 +44,12 @@ struct SndData {
 };
 
 // Start sound system
-SndData *data = (SndData *)malloc(sizeof(SndData));
+SndData *snddata = (SndData *)malloc(sizeof(SndData));
 PaStream *stream;
 PaError error;
 PaStreamParameters outputParameters;
+
+// vector<SndData *> playingnotes;
 
 /*
 Callback function for audio output
@@ -57,7 +59,9 @@ int Callback(const void *input,
              unsigned long frameCount,
              const PaStreamCallbackTimeInfo* paTimeInfo,
              PaStreamCallbackFlags statusFlags,
-             void *userData) {
+             void *userData) 
+{
+
   SndData *data = (SndData *)userData; /* we passed a data structure into the callback so we have something to work with */
   int *cursor; /* current pointer into the output  */
   int *out = (int *)output;
@@ -71,23 +75,16 @@ int Callback(const void *input,
 
     /* are we going to read past the end of the file?*/
     if (thisSize > (data->sfInfo.frames - data->position)) {
-      /*if we are, only read to the end of the file*/
-      thisRead = data->sfInfo.frames - data->position;
-      /* and then loop to the beginning of the file */
-      data->position = 0;
+      // thisRead = data->sfInfo.frames - data->position; /*if we are, only read to the end of the file*/
+      // data->position = 0; /* and then loop to the beginning of the file */
+    	return paContinue;
     } else {
-      /* otherwise, we'll just fill up the rest of the output buffer */
-      thisRead = thisSize;
-      /* and increment the file position */
-      data->position += thisRead;
+      thisRead = thisSize; /* otherwise, we'll just fill up the rest of the output buffer */
+      data->position += thisRead; /* and increment the file position */
     }
 
-    /* since our output format and channel interleaving is the same as sf_readf_int's requirements */
-    /* we'll just read straight into the output buffer */
     sf_readf_int(data->sndFile, cursor, thisRead);
-    /* increment the output cursor*/
     cursor += thisRead;
-    /* decrement the number of samples left to process */
     thisSize -= thisRead;
   }
 
@@ -379,6 +376,7 @@ class NotePlayer {
 
 			
 			printf("note=%i\n",noteval);
+			snddata->position = 0;
 			/*self.notes[noteval].stop()
 			self.notes[noteval].play()
 			self.acnotes[noteval] = true
@@ -1034,11 +1032,11 @@ int main(int argc, char **argv) {
 
 	// Start sound system
 	/* initialize our data structure */
-	data->position = 0;
-	data->sfInfo.format = 0;
+	snddata->position = 0;
+	snddata->sfInfo.format = 0;
 	/* try to open the file */
-	data->sndFile = sf_open(FILE_NAME, SFM_READ, &data->sfInfo);
-	if (!data->sndFile) {
+	snddata->sndFile = sf_open(FILE_NAME, SFM_READ, &snddata->sfInfo);
+	if (!snddata->sndFile) {
 	  printf("error opening file\n");
 	  return 1;
 	}
@@ -1046,7 +1044,7 @@ int main(int argc, char **argv) {
 	Pa_Initialize();
 	  /* set the output parameters */
 	outputParameters.device = Pa_GetDefaultOutputDevice(); /* use the default device */
-	outputParameters.channelCount = data->sfInfo.channels; /* use the same number of channels as our sound file */
+	outputParameters.channelCount = snddata->sfInfo.channels; /* use the same number of channels as our sound file */
 	outputParameters.sampleFormat = paInt32; /* 32bit int format */
 	outputParameters.suggestedLatency = 0.01; /* 10 ms latency, if possible */
 	outputParameters.hostApiSpecificStreamInfo = 0; /* no api specific data */
@@ -1055,11 +1053,11 @@ int main(int argc, char **argv) {
 	error = Pa_OpenStream(&stream,  /* stream is a 'token' that we need to save for future portaudio calls */
 	                    0,  /* no input */
 	                    &outputParameters,
-	                    data->sfInfo.samplerate,  /* use the same sample rate as the sound file */
+	                    snddata->sfInfo.samplerate,  /* use the same sample rate as the sound file */
 	                    paFramesPerBufferUnspecified,  /* let portaudio choose the buffersize */
 	                    paNoFlag,  /* no special modes (clip off, dither off) */
 	                    Callback,  /* callback function defined above */
-	                    data ); /* pass in our data structure so the callback knows what's up */
+	                    snddata ); /* pass in our data structure so the callback knows what's up */
 
 	/* if we can't open it, then bail out */
 	if (error) {
