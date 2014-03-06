@@ -3,7 +3,10 @@
 
 const float NOTE_RATIOS[12] = {1,1.059,1.122,1.189,1.26,1.334,1.4142,1.498,1.587,1.682,1.7818,1.887};
 bool recording = false;
+bool playing = false;
 int INDEX = 0;
+float SCROLL = 0;
+float VIEW_SCALE = 1.0f;
 
 NotePlayer::NotePlayer(bool cont) {
 	continuous = cont;
@@ -46,9 +49,9 @@ bool Subtrack::play(int index, NotePlayer * player) {
 void Track::init() {
 	trackslen[0]=0; // List of lengths of all subtracks
 	tracksindex=0;
-	
+
 	playing=true;
-	
+
 	// self.definition = xml_to_dict(etree.parse('instruments/strings/basic strings/instrument.xml').getroot())['instrument']
 	// try:
 	// 	self.player = NotePlayer(True if self.definition['continuous'].lower()=='yes' else False)
@@ -77,7 +80,7 @@ void Track::init() {
 	// self.leftimg = tbg_s_l_img
 	// self.rightimg = tbg_s_r_img
 }
-		
+
 // void Track::img() {
 // 	return this==ACTIVETRACK ? int_img : tg_img;
 // }
@@ -144,6 +147,15 @@ void FreeJamApp::setup(){
 	//----------------------------------------------------------
 	stageimg.loadImage("resources/image-textures/floor.png");
 	barimg.loadImage("resources/image-textures/bar.png");
+	record_img.loadImage("resources/image-textures/record_b.png");
+	recording_img.loadImage("resources/image-textures/record_active.png");
+	rw_beg_img.loadImage("resources/image-textures/rewind_to_beginning.png");
+	rw_img.loadImage("resources/image-textures/rewind.png");
+	play_img.loadImage("resources/image-textures/play.png");
+	pause_img.loadImage("resources/image-textures/pause.png");
+	ff_img.loadImage("resources/image-textures/fastforward.png");
+	ff_end_img.loadImage("resources/image-textures/forward_to_end.png");
+	slider_img.loadImage("resources/image-textures/slider.png");
 	key_cf.loadImage("resources/image-textures/key_cf.png");
 	key_dga.loadImage("resources/image-textures/key_dga.png");
 	key_eb.loadImage("resources/image-textures/key_eb.png");
@@ -209,7 +221,7 @@ void FreeJamApp::draw(){
 	font.drawString("vocals !!", widthDiv*2+50,50);
 
 	ofSetHexColor(0x000000);
-	tempStr = "click to play (multiplay)\npct done: "+ofToString(vocals.getPosition())+"\nspeed: " + ofToString(vocals.getSpeed());	
+	tempStr = "click to play (multiplay)\npct done: "+ofToString(vocals.getPosition())+"\nspeed: " + ofToString(vocals.getSpeed());
 	ofDrawBitmapString(tempStr, widthDiv*2+50,ofGetHeight()-50);
 
 	//-------------------------------------------
@@ -282,6 +294,46 @@ void FreeJamApp::draw(){
 	}
 	//---------------------------------------------- Control Bar
 	barimg.draw(0,ofGetHeight()-vbarloc,ofGetWidth(),barimg.height);
+	float controlheight = ofGetHeight()+barimg.height/2-(vbarloc+play_img.height/2);
+	float controlsx = ofGetWidth()/2;
+	if (recording) {
+		recording_img.draw(max(controlsx-100,(float)ofGetWidth()/3),ofGetHeight()+barimg.height/2-(vbarloc+record_img.height/2));
+	} else {
+		record_img.draw(max(controlsx-100,(float)ofGetWidth()/3),ofGetHeight()+barimg.height/2-(vbarloc+record_img.height/2));
+	}
+	rw_beg_img.draw(controlsx,controlheight);
+
+	controlsx+=rw_beg_img.width;
+	rw_img.draw(controlsx,controlheight);
+	controlsx+=rw_img.width;
+	if (playing) {
+		pause_img.draw(controlsx,controlheight);
+		controlsx+=pause_img.width;
+	} else {
+		play_img.draw(controlsx,controlheight);
+		controlsx+=play_img.width;
+	}
+	ff_img.draw(controlsx,controlheight);
+	controlsx+=ff_img.width;
+	ff_end_img.draw(controlsx,controlheight);
+	//------------------------------------------
+
+	//----------- Tracks ---------------------//
+	ofSetColor(184,184,184);
+	ofFill();
+	ofRect(0,ofGetHeight()+barimg.height-vbarloc,ofGetWidth(),vbarloc-barimg.height);
+	// for i in xrange(len(TRACKS)):
+	// 	draw_track(TRACKS[i],i,width)
+	ofSetColor(84,84,84);
+	ofLine(150,ofGetHeight()+barimg.height-vbarloc,150,ofGetHeight());
+	ofSetColor(255,0,0);
+	ofLine(151+(INDEX-SCROLL)*VIEW_SCALE,ofGetHeight(),151+(INDEX-SCROLL)*VIEW_SCALE,ofGetHeight()+barimg.height-vbarloc);
+	ofSetColor(237,237,237);
+	ofRect(151,ofGetHeight()-16,ofGetWidth()-150,16);
+	ofSetColor(84,84,84);
+	ofLine(155,ofGetHeight()-8,ofGetWidth()-4,ofGetHeight()-8);
+	ofSetColor(255,255,255);
+	slider_img.draw(min(VIEW_SCALE*64+154,(float)ofGetWidth()-8),ofGetHeight()-13);
 
 }
 
@@ -366,7 +418,7 @@ void FreeJamApp::mousePressed(int x, int y, int button){
 		vocals.play();
 		vocals.setSpeed(note(noteval));
 		return;
-	} 
+	}
 
 	if (ofGetHeight()-vbarloc<y and y<ofGetHeight()+barimg.height-vbarloc) {
 		dragging_vbar = true;
@@ -390,7 +442,7 @@ void FreeJamApp::mouseReleased(int x, int y, int button){
 
 //--------------------------------------------------------------
 void FreeJamApp::windowResized(int w, int h){
-	
+
 }
 
 //--------------------------------------------------------------

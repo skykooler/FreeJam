@@ -11,7 +11,10 @@ using namespace std;
 
 extern const float NOTE_RATIOS[12];
 extern bool recording;
+extern bool playing;
 extern int INDEX;
+extern float SCROLL;
+extern float VIEW_SCALE;
 
 float note(float val);
 
@@ -43,7 +46,16 @@ class FreeJamApp: public ofBaseApp{
 
 		ofImage stageimg;
 		ofImage barimg;
-		
+		ofImage record_img;
+		ofImage recording_img;
+		ofImage rw_beg_img;
+		ofImage rw_img;
+		ofImage play_img;
+		ofImage pause_img;
+		ofImage ff_img;
+		ofImage ff_end_img;
+		ofImage slider_img;
+
 		ofImage key_cf;
 		ofImage key_dga;
 		ofImage key_eb;
