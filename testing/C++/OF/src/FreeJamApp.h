@@ -9,12 +9,55 @@
 
 using namespace std;
 
+
+class NotePlayer {
+	public:
+		NotePlayer (bool cont);
+		void play_note(int noteval, float volume);
+		void stop_note(int noteval);
+		bool continuous;
+		bool fadein;
+	private:
+		vector<ofSoundPlayer *> notes;
+};
+
+class Subtrack {
+	public:
+		int size();
+		bool play(int index, NotePlayer * player);
+		vector<vector<int> > data; // Inside one is 176 ints long
+};
+
+class Track {
+public:
+	Track ();
+	void add(Subtrack subtrack);
+	bool play(int INDEX);
+	void set_text(string text);
+	void play_note(int noteval, float volume);
+	void stop_note(int noteval);
+	// ofImage * img();
+
+	vector<Subtrack> tracks;
+	vector<float> trackslen;
+	int tracksindex;
+	bool playing;
+	string label;
+	Subtrack * currenttrack;
+	NotePlayer * player;
+	ofImage int_img;
+};
+
+// extern 
+extern Track * ACTIVETRACK;
 extern const float NOTE_RATIOS[12];
 extern bool recording;
 extern bool playing;
 extern int INDEX;
 extern float SCROLL;
 extern float VIEW_SCALE;
+extern int STEP;
+extern float SIDE_WIDTH;
 
 float note(float val);
 
@@ -25,6 +68,7 @@ class FreeJamApp: public ofBaseApp{
 		void setup();
 		void update();
 		void draw();
+		void draw_track(Track * track, int num, float width);
 
 		void keyPressed  (int key);
 		void keyReleased(int key);
@@ -56,6 +100,26 @@ class FreeJamApp: public ofBaseApp{
 		ofImage ff_end_img;
 		ofImage slider_img;
 
+		ofImage trackbg_img;
+		ofImage tsa_img;
+		ofImage tra_img;
+		ofImage tla_img;
+		ofImage toa_img;
+		ofImage tg_img;
+
+		ofImage tbg_s_img;
+		ofImage tbg_s_l_img;
+		ofImage tbg_s_r_img;
+		ofImage tbg_r_img;
+		ofImage tbg_r_l_img;
+		ofImage tbg_r_r_img;
+		ofImage tbg_l_img;
+		ofImage tbg_l_l_img;
+		ofImage tbg_l_r_img;
+		ofImage tbg_o_img;
+		ofImage tbg_o_l_img;
+		ofImage tbg_o_r_img;
+
 		ofImage key_cf;
 		ofImage key_dga;
 		ofImage key_eb;
@@ -76,42 +140,9 @@ class FreeJamApp: public ofBaseApp{
 
 		// vector<int> KEYPRESS_MASK;
 		map<int, bool> KEYPRESS_MASK;
+
+		std::vector<Track *> TRACKS;
 		
-};
-
-class NotePlayer {
-	public:
-		NotePlayer (bool cont);
-		void play_note(int noteval, float volume);
-		void stop_note(int noteval);
-		bool continuous;
-		bool fadein;
-	private:
-		vector<ofSoundPlayer *> notes;
-};
-
-class Subtrack {
-	public:
-		int size();
-		bool play(int index, NotePlayer * player);
-		vector<vector<int> > data; // Inside one is 176 ints long
-};
-
-class Track {
-	void init();
-	void add(Subtrack subtrack);
-	bool play(int INDEX);
-	void set_text(string text);
-	void play_note(int noteval, float volume);
-	void stop_note(int noteval);
-
-	vector<Subtrack> tracks;
-	vector<float> trackslen;
-	int tracksindex;
-	bool playing;
-	string label;
-	Subtrack * currenttrack;
-	NotePlayer * player;
 };
 
 enum {

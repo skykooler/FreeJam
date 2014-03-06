@@ -1,5 +1,5 @@
 #include "FreeJamApp.h"
-
+#include <vector>
 
 const float NOTE_RATIOS[12] = {1,1.059,1.122,1.189,1.26,1.334,1.4142,1.498,1.587,1.682,1.7818,1.887};
 bool recording = false;
@@ -7,6 +7,10 @@ bool playing = false;
 int INDEX = 0;
 float SCROLL = 0;
 float VIEW_SCALE = 1.0f;
+int STEP = 64; // maximum resolution is 64th notes
+float SIDE_WIDTH = 150;
+Track * ACTIVETRACK;
+
 
 NotePlayer::NotePlayer(bool cont) {
 	continuous = cont;
@@ -46,11 +50,11 @@ bool Subtrack::play(int index, NotePlayer * player) {
 	return (index==data.size()-1);
 }
 
-void Track::init() {
-	trackslen[0]=0; // List of lengths of all subtracks
+Track::Track() {
+	trackslen.push_back(0); // List of lengths of all subtracks
 	tracksindex=0;
 
-	playing=true;
+	// playing=true;
 
 	// self.definition = xml_to_dict(etree.parse('instruments/strings/basic strings/instrument.xml').getroot())['instrument']
 	// try:
@@ -74,15 +78,16 @@ void Track::init() {
 	// 	self.player.pitchbend = True if self.definition['pitchbend'].lower()=='yes' else False
 	// except:
 	// 	self.player.pitchbend = False
-	label = "";
-	// self.int_img = tsa_img
+	// label = "";
+	label = "Track 1";
+	// int_img = tsa_img;
 	// self.cimg = tbg_s_img
 	// self.leftimg = tbg_s_l_img
 	// self.rightimg = tbg_s_r_img
 }
 
-// void Track::img() {
-// 	return this==ACTIVETRACK ? int_img : tg_img;
+// ofImage * Track::img() {
+// 	return this==ACTIVETRACK ? &int_img : &tg_img;
 // }
 void Track::add(Subtrack subtrack) {
 	tracks.push_back(subtrack);
@@ -134,7 +139,8 @@ void FreeJamApp::setup(){
 	synth.setVolume(0.75f);
 	beats.setVolume(0.75f);
 	vocals.setVolume(0.5f);
-	font.loadFont("Sudbury_Basin_3D.ttf", 32);
+	// font.loadFont("Sudbury_Basin_3D.ttf", 32);
+	font.loadFont("FreeSerif.ttf", 10);
 	beats.setMultiPlay(false);
 	vocals.setMultiPlay(true);
 	playMode = KEYBOARD;
@@ -156,6 +162,27 @@ void FreeJamApp::setup(){
 	ff_img.loadImage("resources/image-textures/fastforward.png");
 	ff_end_img.loadImage("resources/image-textures/forward_to_end.png");
 	slider_img.loadImage("resources/image-textures/slider.png");
+
+	trackbg_img.loadImage("resources/image-textures/trackbg.png");
+	tsa_img.loadImage("resources/image-textures/track_software_active.png");
+	tra_img.loadImage("resources/image-textures/track_real_active.png");
+	tla_img.loadImage("resources/image-textures/track_loop_active.png");
+	toa_img.loadImage("resources/image-textures/track_other_active.png");
+	tg_img.loadImage("resources/image-textures/track_generic.png");
+
+	tbg_s_img.loadImage("resources/image-textures/track_software_bg.png");
+	tbg_s_l_img.loadImage("resources/image-textures/track_software_bg_left.png");
+	tbg_s_r_img.loadImage("resources/image-textures/track_software_bg_right.png");
+	tbg_r_img.loadImage("resources/image-textures/track_real_bg.png");
+	tbg_r_l_img.loadImage("resources/image-textures/track_real_bg_left.png");
+	tbg_r_r_img.loadImage("resources/image-textures/track_real_bg_right.png");
+	tbg_l_img.loadImage("resources/image-textures/track_loop_bg.png");
+	tbg_l_l_img.loadImage("resources/image-textures/track_loop_bg_left.png");
+	tbg_l_r_img.loadImage("resources/image-textures/track_loop_bg_right.png");
+	tbg_o_img.loadImage("resources/image-textures/track_other_bg.png");
+	tbg_o_l_img.loadImage("resources/image-textures/track_other_bg_left.png");
+	tbg_o_r_img.loadImage("resources/image-textures/track_other_bg_right.png");
+
 	key_cf.loadImage("resources/image-textures/key_cf.png");
 	key_dga.loadImage("resources/image-textures/key_dga.png");
 	key_eb.loadImage("resources/image-textures/key_eb.png");
@@ -164,6 +191,11 @@ void FreeJamApp::setup(){
 	key_dga_pressed.loadImage("resources/image-textures/key_dga_pressed.png");
 	key_eb_pressed.loadImage("resources/image-textures/key_eb_pressed.png");
 	key_black_pressed.loadImage("resources/image-textures/key_black_pressed.png");
+
+
+	Track * t = new Track();
+	TRACKS.push_back(t);
+	ACTIVETRACK = TRACKS[0];
 }
 
 //--------------------------------------------------------------
@@ -319,18 +351,23 @@ void FreeJamApp::draw(){
 	//------------------------------------------
 
 	//----------- Tracks ---------------------//
+	// Track background
 	ofSetColor(184,184,184);
 	ofFill();
 	ofRect(0,ofGetHeight()+barimg.height-vbarloc,ofGetWidth(),vbarloc-barimg.height);
-	// for i in xrange(len(TRACKS)):
-	// 	draw_track(TRACKS[i],i,width)
+	for (int i=0; i<TRACKS.size();i++) {
+		draw_track(TRACKS[i],i,ofGetWidth());
+	}
 	ofSetColor(84,84,84);
 	ofLine(150,ofGetHeight()+barimg.height-vbarloc,150,ofGetHeight());
+	// Scrub bar
 	ofSetColor(255,0,0);
 	ofLine(151+(INDEX-SCROLL)*VIEW_SCALE,ofGetHeight(),151+(INDEX-SCROLL)*VIEW_SCALE,ofGetHeight()+barimg.height-vbarloc);
+	// Slider background
 	ofSetColor(237,237,237);
 	ofRect(151,ofGetHeight()-16,ofGetWidth()-150,16);
 	ofSetColor(84,84,84);
+	// Slider track
 	ofLine(155,ofGetHeight()-8,ofGetWidth()-4,ofGetHeight()-8);
 	ofSetColor(255,255,255);
 	slider_img.draw(min(VIEW_SCALE*64+154,(float)ofGetWidth()-8),ofGetHeight()-13);
@@ -402,6 +439,9 @@ void FreeJamApp::mousePressed(int x, int y, int button){
 		vocals.setPan( ofMap(x, widthStep*2, widthStep*3, -1, 1, true) );
 	}*/
 
+	float ch = ofGetHeight()+(barimg.height/2-play_img.height/2)-vbarloc;
+	float cx = ofGetWidth()/2;
+
 	if (y<(ofGetHeight()-vbarloc) and playMode==KEYBOARD){
 		//keyscale = max((height-vbarloc)/(key_cf_img.height*1.0),0.25)
 		int noteval = floor(x/(keyscalex)*12/7.0)+36;
@@ -417,6 +457,50 @@ void FreeJamApp::mousePressed(int x, int y, int button){
 		// ACTIVETRACK.play_note(noteval,1)
 		vocals.play();
 		vocals.setSpeed(note(noteval));
+		return;
+	} else if (max(cx-100,(float)ofGetWidth()/3)<x and x<max(cx-100,(float)ofGetWidth()/3)+record_img.width and vbarloc-(barimg.height/2+record_img.height/2)<y<vbarloc-(barimg.height/2)+record_img.height/2) {
+		if (recording) {
+			recording = false;
+		} else {
+			if (not playing) {
+				playing = true;
+			}
+			recording = true;
+			(*ACTIVETRACK).add(*(new Subtrack()));
+		}
+		return;
+	} else if (cx<x and x<cx+rw_beg_img.width and ch<y and y<ch+rw_beg_img.height) {
+		INDEX = 0;
+		return;
+	}
+	cx+=rw_beg_img.width;
+	if (cx<x and x<cx+rw_img.width and ch<y and y<ch+rw_img.height) {
+		INDEX = (INDEX-1);
+		INDEX = INDEX-INDEX%STEP;
+		return;
+	}
+	cx+=rw_img.width;
+	if (playing) {
+		if (cx<x and x<cx+pause_img.width and ch<y and y<ch+pause_img.height) {
+			playing = false;
+			recording = false;
+			return;
+		}
+		cx+=pause_img.width;
+	} else {
+		if (cx<x and x<cx+play_img.width and ch<y and y<ch+play_img.height) {
+			playing = true;
+			return;
+		}
+		cx+=play_img.width;
+	}
+	if (cx<x and x<cx+ff_img.width and ch<y and y<ch+ff_img.height) {
+		INDEX = INDEX-INDEX%STEP+STEP;
+		return;
+	}
+	cx+=ff_img.width;
+	if (cx<x and x<cx+ff_end_img.width and ch<y and y<ch+ff_end_img.height) {
+		// fast_forward_end();
 		return;
 	}
 
@@ -453,4 +537,55 @@ void FreeJamApp::gotMessage(ofMessage msg){
 //--------------------------------------------------------------
 void FreeJamApp::dragEvent(ofDragInfo dragInfo){
 
+}
+
+void FreeJamApp::draw_track(Track * track,int num,float width) {
+	float TOP_HEIGHT=(ofGetHeight()+barimg.height)-vbarloc+((num)*(tsa_img).height);
+
+	ofSetColor(255,255,255);
+	trackbg_img.draw(0,TOP_HEIGHT,ofGetWidth(),trackbg_img.height);
+
+	for (int i=0; i<ofGetWidth(); i++) {
+		if (i%STEP==0) {
+			ofSetColor(84,84,84);
+			ofLine((i-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,TOP_HEIGHT,(i-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,TOP_HEIGHT+tsa_img.height-3);
+		}
+	}
+	ofSetColor(255,255,255);
+	int track_index = 0;
+	int time_index = 0;
+	for ( int i=0; i<(*track).tracks.size(); i++) {
+	// 	if not i.is_silence():
+	// 		pass
+	// 		#print time_index
+			// track.leftimg.blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,TOP_HEIGHT+4);
+			tbg_s_l_img.draw((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,TOP_HEIGHT);
+	// 		track.cimg.blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+5,TOP_HEIGHT+4,width=len(i)*VIEW_SCALE-8)
+			tbg_s_img.draw((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+5,TOP_HEIGHT,(*track).tracks[i].size()*VIEW_SCALE-8,tbg_s_img.height);
+	// 		track.rightimg.blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+len(i)*VIEW_SCALE-4,TOP_HEIGHT+4)
+			tbg_s_r_img.draw((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+(*track).tracks[i].size()*VIEW_SCALE-4,TOP_HEIGHT);
+	// 		for j in xrange(len(i.data)):
+	// 			if i.data[j]:
+	// 				#for [k,l,m] in i.data[j]:
+	// 				#	rgb084084084.blit((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,TOP_HEIGHT+8+k%28,width=m*VIEW_SCALE)
+	// 				for r in xrange(len(i.data[j])):
+	// 					#1 indicates note-on, 255 indicates note-off
+	// 					if i.data[j][r]==1 :
+	// 						length = 0;
+	// 						for k in xrange(j, len(i.data)):
+	// 							if i.data[k][r]==255:
+	// 								break
+	// 							length+=1
+	// 						rgb084084084.blit((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,TOP_HEIGHT+8+r%28,width=length*VIEW_SCALE)
+	//
+	//		#draw_rect((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,TOP_HEIGHT+8+r%28,length*VIEW_SCALE,1,0.33,0.33,0.33);
+	// 	time_index+=len(i)
+	// 	track_index+=1
+	}
+	// TODO: swap out tsa_img depending on track type
+	tsa_img.draw(0,TOP_HEIGHT,SIDE_WIDTH,tsa_img.height);
+	ofSetColor(0,0,0);
+	font.drawString((*track).label, 15, TOP_HEIGHT+tsa_img.height/2 + font.getLineHeight()/2-1);
+	ofSetColor(255,255,255);
+	font.drawString((*track).label, 16, TOP_HEIGHT+tsa_img.height/2 + font.getLineHeight()/2);
 }
