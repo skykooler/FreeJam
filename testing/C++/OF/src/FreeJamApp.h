@@ -23,8 +23,10 @@ class NotePlayer {
 
 class Subtrack {
 	public:
+		Subtrack ();
 		int size();
 		bool play(int index, NotePlayer * player);
+		void add_data();
 		vector<vector<int> > data; // Inside one is 176 ints long
 };
 
@@ -43,7 +45,8 @@ public:
 	int tracksindex;
 	bool playing;
 	string label;
-	Subtrack * currenttrack;
+	// Subtrack * currenttrack;
+	int currenttrack;
 	NotePlayer * player;
 	ofImage int_img;
 };
@@ -69,6 +72,7 @@ class FreeJamApp: public ofBaseApp{
 		void update();
 		void draw();
 		void draw_track(Track * track, int num, float width);
+		void play();
 
 		void keyPressed  (int key);
 		void keyReleased(int key);
