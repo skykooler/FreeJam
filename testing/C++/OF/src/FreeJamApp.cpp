@@ -11,6 +11,30 @@ int STEP = 64; // maximum resolution is 64th notes
 float SIDE_WIDTH = 150;
 Track * ACTIVETRACK;
 
+ofImage trackbg_img;
+ofImage tsa_img;
+ofImage tra_img;
+ofImage tla_img;
+ofImage toa_img;
+ofImage tg_img;
+
+ofImage tbg_s_img;
+ofImage tbg_s_l_img;
+ofImage tbg_s_r_img;
+ofImage tbg_r_img;
+ofImage tbg_r_l_img;
+ofImage tbg_r_r_img;
+ofImage tbg_l_img;
+ofImage tbg_l_l_img;
+ofImage tbg_l_r_img;
+ofImage tbg_o_img;
+ofImage tbg_o_l_img;
+ofImage tbg_o_r_img;
+
+float vbarloc;
+ofTrueTypeFont font;
+ofImage barimg;
+
 int key_to_noteval(int key) {
 	switch (key) {
 		case 'a':
@@ -101,6 +125,9 @@ Subtrack::Subtrack () {
 int Subtrack::size() {
 	return data.size();
 }
+void Subtrack::truncate(int length) {
+	data.resize(length);
+}
 bool Subtrack::play(unsigned int index, NotePlayer * player) {
 	for (int i=0; i<88; i++) {
 		if ( data.at(index)[i] ) {
@@ -113,6 +140,39 @@ bool Subtrack::play(unsigned int index, NotePlayer * player) {
 void Subtrack::add_data() {
 	vector<int> frame (176,0);
 	data.push_back(frame);
+}
+void Subtrack::set_data(int index, int noteval, int value) {
+	data.at(index)[noteval] = value;
+}
+void Subtrack::draw(int track_index, int time_index, float TOP_HEIGHT) {
+	ofSetColor(255,255,255);
+
+	tbg_s_l_img.draw((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,TOP_HEIGHT);
+	tbg_s_img.draw((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+5,TOP_HEIGHT,max(data.size()*VIEW_SCALE-8,0.0f),tbg_s_img.height);
+	tbg_s_r_img.draw((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+data.size()*VIEW_SCALE-4,TOP_HEIGHT);
+
+
+	ofSetColor(84,84,84);
+	for (unsigned int j=0; j<data.size(); j++) {
+		for (unsigned int r=0; r<data.at(j).size(); r++) {
+			if (data.at(j).at(r)==NOTE_ON) {
+				int length = 0;
+				for (unsigned int k=j; k<data.size(); k++) {
+					if (data.at(k).at(r)==NOTE_OFF) {
+						break;
+					}
+					length+=1;
+				}
+				ofLine(	(time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,					TOP_HEIGHT+tsa_img.height-8-r%28,
+						(time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1+length*VIEW_SCALE,TOP_HEIGHT+tsa_img.height-8-r%28);
+			}
+		}
+	}
+	ofSetColor(255,255,255);
+}
+
+LiveSubtrack::LiveSubtrack() {
+	;
 }
 
 Track::Track() {
@@ -155,6 +215,7 @@ Track::Track() {
 // ofImage * Track::img() {
 // 	return this==ACTIVETRACK ? &int_img : &tg_img;
 // }
+
 void Track::add(Subtrack subtrack) {
 	tracks.push_back(subtrack);
 	trackslen.push_back(subtrack.size());
@@ -179,17 +240,52 @@ void Track::set_text(string text) {
 }
 void Track::play_note(int noteval, float volume) {
 	if (recording) {
-		tracks.at(currenttrack).data.at(INDEX)[noteval] = 1; // 1 means note-on. 255 means note-off.
-		tracks.at(currenttrack).data.at(INDEX)[noteval+88] = floor(volume*255);
+		// tracks.at(currenttrack).data.at(INDEX)[noteval] = 1; // 1 means note-on. 255 means note-off.
+		tracks.at(currenttrack).set_data(INDEX,noteval,1); // 1 means note-on. 255 means note-off.
+		tracks.at(currenttrack).set_data(INDEX,noteval+88,floor(volume*255));
 	}
 	player.play_note(noteval,volume);
 	printf("Playing note %i\n", noteval);
 }
 void Track::stop_note(int noteval){
 	if (recording) {
-		tracks.at(currenttrack).data.at(INDEX)[noteval] = 255; // 1 means note-on. 255 means note-off.
+		// tracks.at(currenttrack).data.at(INDEX)[noteval] = 255; // 1 means note-on. 255 means note-off.
+		tracks.at(currenttrack).set_data(INDEX,noteval,255); // 1 means note-on. 255 means note-off.
 	}
 	player.stop_note(noteval);
+}
+void Track::draw(int num) {
+	float TOP_HEIGHT=(ofGetHeight()+barimg.height)-vbarloc+((num)*(tsa_img).height);
+
+	ofSetColor(255,255,255);
+	trackbg_img.draw(0,TOP_HEIGHT,ofGetWidth(),trackbg_img.height);
+
+	for (int i=0; i<ofGetWidth(); i++) {
+		if (i%STEP==0) {
+			ofSetColor(84,84,84);
+			ofLine((i-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,TOP_HEIGHT,(i-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,TOP_HEIGHT+tsa_img.height-3);
+		}
+	}
+	ofSetColor(255,255,255);
+	int track_index = 0;
+	int time_index = 0;
+	for (unsigned int i=0; i<tracks.size(); i++) {
+		tracks[i].draw(track_index,time_index,TOP_HEIGHT);
+		time_index+=tracks.at(i).size();
+		track_index+=1;
+	}
+	// TODO: swap out tsa_img depending on track type
+	tsa_img.draw(0,TOP_HEIGHT,SIDE_WIDTH,tsa_img.height);
+	ofSetColor(0,0,0);
+	font.drawString(label, 15, TOP_HEIGHT+tsa_img.height/2 + font.getLineHeight()/2-1);
+	ofSetColor(255,255,255);
+	font.drawString(label, 16, TOP_HEIGHT+tsa_img.height/2 + font.getLineHeight()/2);
+}
+
+LiveTrack::LiveTrack() {
+	trackslen.push_back(0); // List of lengths of all subtracks
+	tracksindex=0;
+	label = "Track 2";
 }
 
 float note(float val){
@@ -433,7 +529,8 @@ void FreeJamApp::draw(){
 	ofFill();
 	ofRect(0,ofGetHeight()+barimg.height-vbarloc,ofGetWidth(),vbarloc-barimg.height);
 	for (unsigned int i=0; i<TRACKS.size();i++) {
-		draw_track(TRACKS[i],i,ofGetWidth());
+		// draw_track(TRACKS[i],i,ofGetWidth());
+		TRACKS[i]->draw(i);
 	}
 	ofSetColor(84,84,84);
 	ofLine(150,ofGetHeight()+barimg.height-vbarloc,150,ofGetHeight());
@@ -564,6 +661,27 @@ void FreeJamApp::mousePressed(int x, int y, int button){
 				playing = true;
 			}
 			recording = true;
+			// for (unsigned int i=0; i<ACTIVETRACK->tracks.size(); i++) {
+			// 	tracksum+=ACTIVETRACK->trackslen.at(i);
+			// 	if (INDEX<tracksum) {
+			// 		return;
+			// 	}
+			// }
+			int tracksum = 0;
+			if (ACTIVETRACK->tracks.size()>0){
+				if (INDEX>0) {
+					for (unsigned int i=0; i<ACTIVETRACK->trackslen.size(); i++) {
+						tracksum += ACTIVETRACK->trackslen.at(i);
+						if (tracksum>INDEX) {
+							ACTIVETRACK->trackslen.at(i) -= tracksum-INDEX;
+							ACTIVETRACK->tracks[i].truncate(ACTIVETRACK->trackslen.at(i));
+							break;
+						}
+					}
+				} else {
+					return;
+				}
+			}
 			Subtrack subtrack = Subtrack();
 			ACTIVETRACK->add(subtrack);
 		}
@@ -653,6 +771,8 @@ void FreeJamApp::draw_track(Track * track,int num,float width) {
 	int track_index = 0;
 	int time_index = 0;
 	for (unsigned int i=0; i<track->tracks.size(); i++) {
+		track->tracks[i].draw(track_index,time_index,TOP_HEIGHT);
+		/*
 	// 	if not i.is_silence():
 	// 		pass
 	// 		#print time_index
@@ -684,11 +804,11 @@ void FreeJamApp::draw_track(Track * track,int num,float width) {
 					}
 				// }
 			}
-			ofSetColor(255,255,255);
+			ofSetColor(255,255,255);*/
 
 	//		#draw_rect((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,TOP_HEIGHT+8+r%28,length*VIEW_SCALE,1,0.33,0.33,0.33);
-	// 	time_index+=len(i)
-	// 	track_index+=1
+		time_index+=track->tracks.at(i).size();
+		track_index+=1;
 	}
 	// TODO: swap out tsa_img depending on track type
 	tsa_img.draw(0,TOP_HEIGHT,SIDE_WIDTH,tsa_img.height);
@@ -701,6 +821,7 @@ void FreeJamApp::draw_track(Track * track,int num,float width) {
 void FreeJamApp::play() {
 	if (recording) {
 		ACTIVETRACK->tracks.at(ACTIVETRACK->currenttrack).add_data();
+		ACTIVETRACK->trackslen.at(ACTIVETRACK->currenttrack) = ACTIVETRACK->tracks.at(ACTIVETRACK->currenttrack).size();
 	}
 	if (playing) {
 		for (unsigned int i=0; i<TRACKS.size(); i++) {

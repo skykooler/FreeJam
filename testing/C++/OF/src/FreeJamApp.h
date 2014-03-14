@@ -34,9 +34,18 @@ class Subtrack {
 	public:
 		Subtrack ();
 		int size();
+		void truncate(int length);
 		bool play(unsigned int index, NotePlayer * player);
+		void draw(int track_index, int time_index, float TOP_HEIGHT);
 		void add_data();
+		void set_data(int index, int noteval, int value);
+	private:
 		vector<vector<int> > data; // Inside one is 176 ints long
+};
+
+class LiveSubtrack : public Subtrack {
+	public:
+		LiveSubtrack();
 };
 
 class Track {
@@ -47,6 +56,7 @@ public:
 	void set_text(string text);
 	void play_note(int noteval, float volume);
 	void stop_note(int noteval);
+	void draw (int num);
 	// ofImage * img();
 
 	vector<Subtrack> tracks;
@@ -56,8 +66,18 @@ public:
 	string label;
 	// Subtrack * currenttrack;
 	int currenttrack;
-	NotePlayer player;
 	ofImage int_img;
+private:
+	NotePlayer player;
+
+};
+
+class LiveTrack : public Track {
+public:
+	LiveTrack();
+	// bool play(int INDEX);
+	// void play_note(int noteval, float volume);
+	// void stop_note(int noteval);
 };
 
 // extern 
@@ -71,7 +91,32 @@ extern float VIEW_SCALE;
 extern int STEP;
 extern float SIDE_WIDTH;
 
-float note(float val);
+extern	ofImage trackbg_img;
+extern	ofImage tsa_img;
+extern	ofImage tra_img;
+extern	ofImage tla_img;
+extern	ofImage toa_img;
+extern	ofImage tg_img;
+
+extern	ofImage tbg_s_img;
+extern	ofImage tbg_s_l_img;
+extern	ofImage tbg_s_r_img;
+extern	ofImage tbg_r_img;
+extern	ofImage tbg_r_l_img;
+extern	ofImage tbg_r_r_img;
+extern	ofImage tbg_l_img;
+extern	ofImage tbg_l_l_img;
+extern	ofImage tbg_l_r_img;
+extern	ofImage tbg_o_img;
+extern	ofImage tbg_o_l_img;
+extern	ofImage tbg_o_r_img;
+
+extern float vbarloc;
+extern ofTrueTypeFont font;
+extern ofImage barimg;
+
+		
+extern float note(float val);
 
 class FreeJamApp: public ofBaseApp{
 
@@ -98,11 +143,9 @@ class FreeJamApp: public ofBaseApp{
 		ofSoundPlayer  synth;
 		ofSoundPlayer  vocals;
 
-		ofTrueTypeFont	font;
 		float 			synthPosition;
 
 		ofImage stageimg;
-		ofImage barimg;
 		ofImage record_img;
 		ofImage recording_img;
 		ofImage rw_beg_img;
@@ -112,26 +155,6 @@ class FreeJamApp: public ofBaseApp{
 		ofImage ff_img;
 		ofImage ff_end_img;
 		ofImage slider_img;
-
-		ofImage trackbg_img;
-		ofImage tsa_img;
-		ofImage tra_img;
-		ofImage tla_img;
-		ofImage toa_img;
-		ofImage tg_img;
-
-		ofImage tbg_s_img;
-		ofImage tbg_s_l_img;
-		ofImage tbg_s_r_img;
-		ofImage tbg_r_img;
-		ofImage tbg_r_l_img;
-		ofImage tbg_r_r_img;
-		ofImage tbg_l_img;
-		ofImage tbg_l_l_img;
-		ofImage tbg_l_r_img;
-		ofImage tbg_o_img;
-		ofImage tbg_o_l_img;
-		ofImage tbg_o_r_img;
 
 		ofImage key_cf;
 		ofImage key_dga;
@@ -147,7 +170,6 @@ class FreeJamApp: public ofBaseApp{
 		float			keyscaley;
 		float			keyscalexb;
 		float			keyscaleyb;
-		float			vbarloc;
 		bool			dragging_vbar;
 		float			vbar_offset_y;
 
