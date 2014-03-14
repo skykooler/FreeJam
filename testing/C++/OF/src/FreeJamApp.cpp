@@ -4,47 +4,104 @@
 const float NOTE_RATIOS[12] = {1,1.059,1.122,1.189,1.26,1.334,1.4142,1.498,1.587,1.682,1.7818,1.887};
 bool recording = false;
 bool playing = false;
-int INDEX = 0;
+unsigned int INDEX = 0;
 float SCROLL = 0;
 float VIEW_SCALE = 1.0f;
 int STEP = 64; // maximum resolution is 64th notes
 float SIDE_WIDTH = 150;
 Track * ACTIVETRACK;
 
+int key_to_noteval(int key) {
+	switch (key) {
+		case 'a':
+			return 36;
+		case 'w':
+			return 37;
+		case 's':
+			return 38;
+		case 'e':
+			return 39;
+		case 'd':
+			return 40;
+		case 'f':
+			return 41;
+		case 't':
+			return 42;
+		case 'g':
+			return 43;
+		case 'y':
+			return 44;
+		case 'h':
+			return 45;
+		case 'u':
+			return 46;
+		case 'j':
+			return 47;
+		case 'k':
+			return 48;
+		case 'o':
+			return 49;
+		case 'l':
+			return 50;
+		case 'p':
+			return 51;
+		case ';':
+			return 52;
+		case '\'':
+			return 53;
+		case ']':
+			return 53;
+		default:
+			return 0;
+	}
+}
 
-NotePlayer::NotePlayer(bool cont) {
-	continuous = cont;
+
+NotePlayer::NotePlayer() {
 	for (int i=0; i<88; i++) {
 		ofSoundPlayer player;
-		notes.push_back(&player);
+		notes.push_back(player);
 		// self.notes.append(audio.open_file('instruments/strings/basic strings/c.wav'))
 		player.setSpeed(note(i));
-		player.setLoop(continuous);
+	}
+}
+void NotePlayer::set_continuous(bool cont) {
+	continuous = cont;
+	for (unsigned int i=0; i<notes.size(); i++) {
+		notes[i].setLoop(continuous);
+	}
+}
+void NotePlayer::set_sound(string path) {
+	for (unsigned int i=0; i<notes.size(); i++) {
+		notes[i].loadSound(path.c_str());
+		notes[i].setSpeed(note(i));
 	}
 }
 void NotePlayer::play_note(int noteval, float volume) {
-	(*notes.at(noteval)).stop();
-	(*notes.at(noteval)).play();
+	notes.at(noteval).stop();
+	notes.at(noteval).play();
 	// if (fadein) {
 	// 	fadein_note(None,self.notes,noteval,self.fadein,volume)
 	// } else {
-		(*notes.at(noteval)).setVolume(volume);
+		notes.at(noteval).setVolume(volume);
 	// }
 }
 void NotePlayer::stop_note(int noteval){
 	// if (cutoff) {
 	// 	cutoff_note(None,self.notes,noteval,self.cutoff)
+	// } else {
+		notes.at(noteval).stop();
 	// }
 }
 
 Subtrack::Subtrack () {
 	vector<vector<int> > data;
-	printf("Initial size: %i\n", data.size());
+	add_data();
 }
 int Subtrack::size() {
 	return data.size();
 }
-bool Subtrack::play(int index, NotePlayer * player) {
+bool Subtrack::play(unsigned int index, NotePlayer * player) {
 	for (int i=0; i<88; i++) {
 		if ( data.at(index)[i] ) {
 			float volume = data.at(index)[i+88];
@@ -68,7 +125,7 @@ Track::Track() {
 	// try:
 	// 	self.player = NotePlayer(True if self.definition['continuous'].lower()=='yes' else False)
 	// except:
-		player = new NotePlayer(false);
+		player.set_continuous(false);
 	// try:
 	// 	self.player.cutoff = int(self.definition['cutoff'])
 	// except:
@@ -86,6 +143,7 @@ Track::Track() {
 	// 	self.player.pitchbend = True if self.definition['pitchbend'].lower()=='yes' else False
 	// except:
 	// 	self.player.pitchbend = False
+	player.set_sound("sounds/c.wav");
 	// label = "";
 	label = "Track 1";
 	// int_img = tsa_img;
@@ -107,26 +165,31 @@ bool Track::play(int INDEX) {
 	// for i in self.tracks:
 	for(std::vector<Subtrack>::iterator it = tracks.begin(); it != tracks.end(); ++it) {
 		if (INDEX-b<((*it).size())) {
-			return (*it).play(INDEX-b,player);
+			// why am I returning a bool /here/?
+			return (*it).play(INDEX-b,&player);
 		} else {
 			b+=(*it).size();
 		}
 	}
+	// better return false than a garbage value
+	return false;
 }
 void Track::set_text(string text) {
 	label = text;
 }
 void Track::play_note(int noteval, float volume) {
 	if (recording) {
-		tracks.at(currenttrack).data.at(INDEX)[noteval] = true;
+		tracks.at(currenttrack).data.at(INDEX)[noteval] = 1; // 1 means note-on. 255 means note-off.
 		tracks.at(currenttrack).data.at(INDEX)[noteval+88] = floor(volume*255);
 	}
-	(*player).play_note(noteval,volume);
+	player.play_note(noteval,volume);
+	printf("Playing note %i\n", noteval);
 }
 void Track::stop_note(int noteval){
 	if (recording) {
-		tracks.at(currenttrack).data.at(INDEX)[noteval] = 255;
+		tracks.at(currenttrack).data.at(INDEX)[noteval] = 255; // 1 means note-on. 255 means note-off.
 	}
+	player.stop_note(noteval);
 }
 
 float note(float val){
@@ -140,6 +203,7 @@ float note(float val){
 
 //--------------------------------------------------------------
 void FreeJamApp::setup(){
+
 	synth.loadSound("sounds/synth.wav");
 	beats.loadSound("sounds/1085.mp3");
 	//vocals.loadSound("sounds/Violet.mp3");
@@ -204,25 +268,16 @@ void FreeJamApp::setup(){
 	Track * t = new Track();
 	TRACKS.push_back(t);
 	ACTIVETRACK = TRACKS[0];
-	Subtrack subtrack = Subtrack();
-	(*ACTIVETRACK).add(subtrack);
-		ACTIVETRACK->tracks.at(ACTIVETRACK->currenttrack).add_data();
-	printf("bla %i\n", ACTIVETRACK->tracks.at(ACTIVETRACK->currenttrack).size());
-	printf("%i\n",(*ACTIVETRACK).tracks.size());
-	printf("ACTIVETRACK POINTER: %i\n", ACTIVETRACK);
-	// printf("CURRENTTRACK POINTER: %i\n", (*ACTIVETRACK).currenttrack);
+
 }
 
 //--------------------------------------------------------------
 void FreeJamApp::update(){
-	printf("1Update data size: %i\n", ACTIVETRACK->tracks.at(ACTIVETRACK->currenttrack).data.size());
 
 	ofBackground(255,255,255);
-	printf("2Update data size: %i\n", ACTIVETRACK->tracks.at(ACTIVETRACK->currenttrack).data.size());
 
 	// update the sound playing system:
 	ofSoundUpdate();
-	printf("3Update data size: %i\n", ACTIVETRACK->tracks.at(ACTIVETRACK->currenttrack).data.size());
 
 
 	// TODO: proper timing
@@ -232,7 +287,6 @@ void FreeJamApp::update(){
 
 //--------------------------------------------------------------
 void FreeJamApp::draw(){
-	printf("4Update data size: %i\n", ACTIVETRACK->tracks.at(ACTIVETRACK->currenttrack).data.size());
 	keyscaley = max((ofGetHeight()-vbarloc),128.0f);
 	keyscalex = keyscaley*key_cf.width/key_cf.height;
 	keyscalexb = 0.5*keyscalex;
@@ -378,7 +432,7 @@ void FreeJamApp::draw(){
 	ofSetColor(184,184,184);
 	ofFill();
 	ofRect(0,ofGetHeight()+barimg.height-vbarloc,ofGetWidth(),vbarloc-barimg.height);
-	for (int i=0; i<TRACKS.size();i++) {
+	for (unsigned int i=0; i<TRACKS.size();i++) {
 		draw_track(TRACKS[i],i,ofGetWidth());
 	}
 	ofSetColor(84,84,84);
@@ -394,17 +448,34 @@ void FreeJamApp::draw(){
 	ofLine(155,ofGetHeight()-8,ofGetWidth()-4,ofGetHeight()-8);
 	ofSetColor(255,255,255);
 	slider_img.draw(min(VIEW_SCALE*64+154,(float)ofGetWidth()-8),ofGetHeight()-13);
-
-	printf("5Update data size: %i\n", ACTIVETRACK->tracks.at(ACTIVETRACK->currenttrack).data.size());
 }
 
 //--------------------------------------------------------------
 void FreeJamApp::keyPressed  (int key){
+	int noteval = key_to_noteval(key);
+	// if (noteval!=0) {
+	// 	KEYPRESS_MASK[noteval] = true;
+	// 	ACTIVETRACK->play_note(noteval,1);
+	// }
+	map<int,bool>::iterator iter = KEYPRESS_MASK.find(noteval);
+	if ((iter==KEYPRESS_MASK.end() or iter->second==false) and noteval!=0) {
+		KEYPRESS_MASK[noteval] = true;
+		ACTIVETRACK->play_note(noteval,1);
+	}
+	// if symbol in KEYMAP:
+	// 	noteval = KEYMAP[symbol]
+	// 	if not noteval in KEYPRESS_MASK:
+	// 		KEYPRESS_MASK.append(noteval)
+	// 	ACTIVETRACK.play_note(noteval,1)
 }
 
 //--------------------------------------------------------------
 void FreeJamApp::keyReleased(int key){
-
+	int noteval = key_to_noteval(key);
+	if (noteval!=0) {
+		KEYPRESS_MASK[noteval] = false;
+		ACTIVETRACK->stop_note(noteval);
+	}
 }
 
 //--------------------------------------------------------------
@@ -434,9 +505,11 @@ void FreeJamApp::mouseDragged(int x, int y, int button){
 			// if not noteval in KEYPRESS_MASK:
 			// 	KEYPRESS_MASK.append(noteval)
 
-			// ACTIVETRACK.play_note(noteval,1)
-			vocals.play();
-			vocals.setSpeed(note(noteval));
+			ACTIVETRACK->play_note(noteval,1);
+
+
+			// vocals.play();
+			// vocals.setSpeed(note(noteval));
 		}
 		for (iter = KEYPRESS_MASK.begin(); iter != KEYPRESS_MASK.end(); ++iter) {
 			if (iter->first!=noteval) {
@@ -478,9 +551,10 @@ void FreeJamApp::mousePressed(int x, int y, int button){
 		// if not noteval in KEYPRESS_MASK:
 		// 	KEYPRESS_MASK.append(noteval)
 
-		// ACTIVETRACK.play_note(noteval,1)
-		vocals.play();
-		vocals.setSpeed(note(noteval));
+		ACTIVETRACK->play_note(noteval,1);
+
+		// vocals.play();
+		// vocals.setSpeed(note(noteval));
 		return;
 	} else if (max(cx-100,(float)ofGetWidth()/3)<x and x<max(cx-100,(float)ofGetWidth()/3)+record_img.width and (float)ofGetHeight()+(barimg.height/2-record_img.height/2)-vbarloc<y and y<(float)ofGetHeight()+(barimg.height/2)+record_img.height/2-vbarloc) {
 		if (recording) {
@@ -490,14 +564,8 @@ void FreeJamApp::mousePressed(int x, int y, int button){
 				playing = true;
 			}
 			recording = true;
-		printf("1 ACTIVETRACK POINTER: %i\n", ACTIVETRACK);
-		printf("1 CURRENTTRACK POINTER: %i\n", ACTIVETRACK->currenttrack);
 			Subtrack subtrack = Subtrack();
-			(*ACTIVETRACK).add(subtrack);
-		printf("2 ACTIVETRACK POINTER: %i\n", ACTIVETRACK);
-		printf("2 CURRENTTRACK POINTER: %i\n", ACTIVETRACK->currenttrack);
-		printf("Data pointer: %i\n", &ACTIVETRACK->tracks.at(ACTIVETRACK->currenttrack).data);
-		printf("Currenttrack size: %i\n", ACTIVETRACK->tracks.at(ACTIVETRACK->currenttrack).size());
+			ACTIVETRACK->add(subtrack);
 		}
 		return;
 	} else if (cx<x and x<cx+rw_beg_img.width and ch<y and y<ch+rw_beg_img.height) {
@@ -546,7 +614,7 @@ void FreeJamApp::mouseReleased(int x, int y, int button){
 	dragging_vbar = false;
 	map<int,bool>::iterator iter;
 	for (iter = KEYPRESS_MASK.begin(); iter != KEYPRESS_MASK.end(); ++iter) {
-		// ACTIVETRACK.stop_note(iter->first);
+		ACTIVETRACK->stop_note(iter->first);
 		iter->second = false;
 	}
 	vocals.stop();
@@ -584,7 +652,7 @@ void FreeJamApp::draw_track(Track * track,int num,float width) {
 	ofSetColor(255,255,255);
 	int track_index = 0;
 	int time_index = 0;
-	for ( int i=0; i<(*track).tracks.size(); i++) {
+	for (unsigned int i=0; i<track->tracks.size(); i++) {
 	// 	if not i.is_silence():
 	// 		pass
 	// 		#print time_index
@@ -594,20 +662,30 @@ void FreeJamApp::draw_track(Track * track,int num,float width) {
 			tbg_s_img.draw((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+5,TOP_HEIGHT,max((*track).tracks[i].size()*VIEW_SCALE-8,0.0f),tbg_s_img.height);
 	// 		track.rightimg.blit((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+len(i)*VIEW_SCALE-4,TOP_HEIGHT+4)
 			tbg_s_r_img.draw((time_index-SCROLL)*VIEW_SCALE+SIDE_WIDTH+(*track).tracks[i].size()*VIEW_SCALE-4,TOP_HEIGHT);
-	// 		for j in xrange(len(i.data)):
-	// 			if i.data[j]:
-	// 				#for [k,l,m] in i.data[j]:
-	// 				#	rgb084084084.blit((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,TOP_HEIGHT+8+k%28,width=m*VIEW_SCALE)
-	// 				for r in xrange(len(i.data[j])):
-	// 					#1 indicates note-on, 255 indicates note-off
-	// 					if i.data[j][r]==1 :
-	// 						length = 0;
-	// 						for k in xrange(j, len(i.data)):
-	// 							if i.data[k][r]==255:
-	// 								break
-	// 							length+=1
+
+
+			ofSetColor(84,84,84);
+			for (unsigned int j=0; j<track->tracks[i].data.size(); j++) {
+				// if (track->tracks[i].data.at(j)) {
+					for (unsigned int r=0; r<track->tracks[i].data.at(j).size(); r++) {
+						// 1 indicates note-on, 255 indicates note-off
+						if (track->tracks[i].data.at(j).at(r)==NOTE_ON) {
+							int length = 0;
+							for (unsigned int k=j; k<track->tracks[i].data.size(); k++) {
+								if (track->tracks[i].data.at(k).at(r)==NOTE_OFF) {
+									break;
+								}
+								length+=1;
+							}
+							ofLine(	(time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,					TOP_HEIGHT+tsa_img.height-8-r%28,
+									(time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1+length*VIEW_SCALE,TOP_HEIGHT+tsa_img.height-8-r%28);
 	// 						rgb084084084.blit((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,TOP_HEIGHT+8+r%28,width=length*VIEW_SCALE)
-	//
+						}
+					}
+				// }
+			}
+			ofSetColor(255,255,255);
+
 	//		#draw_rect((time_index+j-SCROLL)*VIEW_SCALE+SIDE_WIDTH+1,TOP_HEIGHT+8+r%28,length*VIEW_SCALE,1,0.33,0.33,0.33);
 	// 	time_index+=len(i)
 	// 	track_index+=1
@@ -621,9 +699,11 @@ void FreeJamApp::draw_track(Track * track,int num,float width) {
 }
 
 void FreeJamApp::play() {
-	printf("A %i\n", ACTIVETRACK->tracks.at(ACTIVETRACK->currenttrack).size());
+	if (recording) {
+		ACTIVETRACK->tracks.at(ACTIVETRACK->currenttrack).add_data();
+	}
 	if (playing) {
-		for (int i=0; i<TRACKS.size(); i++) {
+		for (unsigned int i=0; i<TRACKS.size(); i++) {
 			(*TRACKS[i]).play(INDEX);
 		}
 		if (INDEX<256) {	//TODO: calculate this value
@@ -632,10 +712,5 @@ void FreeJamApp::play() {
 			playing = false;
 			recording = false;
 		}
-	}
-	if (recording) {
-		ACTIVETRACK->tracks.at(ACTIVETRACK->currenttrack).add_data();
-		ofExit();
-		printf("IOJJOJJOIOJIJOOJOIIJJOJI\n");
 	}
 }

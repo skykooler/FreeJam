@@ -7,25 +7,34 @@
 #include <math.h>
 #include <string>
 
+#ifndef NOTE_ON
+#define NOTE_ON 1
+#endif
+#ifndef NOTE_OFF
+#define NOTE_OFF 255
+#endif
+
 using namespace std;
 
 
 class NotePlayer {
 	public:
-		NotePlayer (bool cont);
+		NotePlayer ();
+		void set_continuous(bool cont);
+		void set_sound(string path);
 		void play_note(int noteval, float volume);
 		void stop_note(int noteval);
 		bool continuous;
 		bool fadein;
 	private:
-		vector<ofSoundPlayer *> notes;
+		vector<ofSoundPlayer> notes;
 };
 
 class Subtrack {
 	public:
 		Subtrack ();
 		int size();
-		bool play(int index, NotePlayer * player);
+		bool play(unsigned int index, NotePlayer * player);
 		void add_data();
 		vector<vector<int> > data; // Inside one is 176 ints long
 };
@@ -47,7 +56,7 @@ public:
 	string label;
 	// Subtrack * currenttrack;
 	int currenttrack;
-	NotePlayer * player;
+	NotePlayer player;
 	ofImage int_img;
 };
 
@@ -56,7 +65,7 @@ extern Track * ACTIVETRACK;
 extern const float NOTE_RATIOS[12];
 extern bool recording;
 extern bool playing;
-extern int INDEX;
+extern unsigned int INDEX;	// we can't have sound before the start of a song anyway, so this is unsigned
 extern float SCROLL;
 extern float VIEW_SCALE;
 extern int STEP;
