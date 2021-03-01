@@ -1,3 +1,4 @@
 *.app/
 *.d
 *.o
+target/*

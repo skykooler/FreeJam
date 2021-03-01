@@ -1,0 +1,10 @@
+[package]
+name = "freejam"
+version = "0.1.0"
+authors = ["Skyler Lehmkuhl <skycooler@gmail.com>"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+cpal = { version = "*" }
