@@ -2,10 +2,18 @@
 name = "freejam"
 version = "0.1.0"
 authors = ["Skyler Lehmkuhl <skycooler@gmail.com>"]
+edition = "2018"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
 cpal = { version = "*" }
-dasp_graph = { version = "*"}
+# dasp_graph = { version = "*" }
+dasp_slice = { version = "*" }
+dasp_frame = { version = "*" }
+dasp_signal = { version = "*" }
+petgraph = { version = "*" }
+
+[dependencies.dasp_graph]
+features = ["node-boxed", "node-graph", "node-signal", "node-delay", "node-sum"]

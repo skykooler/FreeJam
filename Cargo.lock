@@ -521,7 +521,11 @@ name = "freejam"
 version = "0.1.0"
 dependencies = [
  "cpal",
+ "dasp_frame",
  "dasp_graph",
+ "dasp_signal",
+ "dasp_slice",
+ "petgraph",
 ]
 
 [[package]]

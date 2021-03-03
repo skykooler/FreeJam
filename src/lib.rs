@@ -4,6 +4,12 @@ extern crate cpal;
 use cpal::{Sample, Stream};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::{Arc, RwLock};
+use dasp_graph::{Node, NodeData, Buffer, Input, BoxedNode};
+use dasp_graph::node::Sum as SumNode;
+use dasp_signal::{self as signal, Signal};
+// use dasp_frame::Frame;
+use dasp_slice;
+use petgraph;
 // use std::time::Duration;
 // use std::thread;
 
@@ -58,6 +64,9 @@ struct MidiInput {
     notes: Vec<MidiNote>
 }
 
+type Graph = petgraph::stable_graph::StableDiGraph<NodeData<BoxedNode>, (), u32>;
+type Processor = dasp_graph::Processor<Graph>;
+
 #[no_mangle]
 pub extern fn test(value: i32) -> i32 {
     value * 10
@@ -79,6 +88,20 @@ pub extern fn audioloop() -> *mut AudioSystem {
     println!("{:?}", sample_rate);
     let config = supported_config.into();
 
+
+    let max_nodes = 1024;
+    let max_edges = 1024;
+    let mut g = Graph::with_capacity(max_nodes, max_edges);
+    let mut p = Processor::with_capacity(max_nodes);
+    let sine = Box::new(signal::noise(0)) as Box<dyn Signal<Frame=f64>>;
+    // let mut sine = BoxedNode::new(Box::new(signal::rate(48000.0).const_hz(440.0).sine()) as Box<dyn Signal<Frame=f64>>);
+    // let out = SumNode::new();
+    g.add_node(NodeData::new1(BoxedNode::new(sine)));
+    // g.add_node(out);
+    // g.extend_with_edges(&[(sine, out)]);
+
+
+
     let streamarc = Arc::clone(&stream_input);
     let stream = output_device.build_output_stream(
         &config,
@@ -90,7 +113,6 @@ pub extern fn audioloop() -> *mut AudioSystem {
             for sample in data.iter_mut() {
                 n+=1;
                 raw_sample = 0.0;
-                // if midi_input.len() > 0 {
                 for input in midi_input.iter() {
                     let freq: u32 = MIDI_FREQS[input.note as usize] as u32;
                     let wavelength = sample_rate.0 / freq;
