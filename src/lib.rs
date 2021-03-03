@@ -4,7 +4,7 @@ extern crate cpal;
 use cpal::{Sample, Stream};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::{Arc, RwLock};
-use dasp_graph::{Node, NodeData, Buffer, Input, BoxedNode};
+use dasp_graph::{Node, NodeData, Buffer, Input, BoxedNodeSend};
 use dasp_graph::node::Sum as SumNode;
 use dasp_signal::{self as signal, Signal};
 // use dasp_frame::Frame;
@@ -64,7 +64,24 @@ struct MidiInput {
     notes: Vec<MidiNote>
 }
 
-type Graph = petgraph::stable_graph::StableDiGraph<NodeData<BoxedNode>, (), u32>;
+pub struct SquareNode;
+
+impl Node for SquareNode {
+    fn process(&mut self, inputs: &[Input], output: &mut [Buffer]) {
+        // Fill the output with silence.
+        for out_buffer in output.iter_mut() {
+            out_buffer.silence();
+        }
+        let mut n=0;
+        let wavelength = 100;
+        for (channel, out_buffer) in output.iter_mut().enumerate() {
+            *out_buffer = Buffer::from([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,
+                1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0])
+        }
+    }
+}
+
+type Graph = petgraph::stable_graph::StableDiGraph<NodeData<BoxedNodeSend>, (), u32>;
 type Processor = dasp_graph::Processor<Graph>;
 
 #[no_mangle]
@@ -93,12 +110,13 @@ pub extern fn audioloop() -> *mut AudioSystem {
     let max_edges = 1024;
     let mut g = Graph::with_capacity(max_nodes, max_edges);
     let mut p = Processor::with_capacity(max_nodes);
-    let sine = Box::new(signal::noise(0)) as Box<dyn Signal<Frame=f64>>;
-    // let mut sine = BoxedNode::new(Box::new(signal::rate(48000.0).const_hz(440.0).sine()) as Box<dyn Signal<Frame=f64>>);
-    // let out = SumNode::new();
-    g.add_node(NodeData::new1(BoxedNode::new(sine)));
-    // g.add_node(out);
-    // g.extend_with_edges(&[(sine, out)]);
+    let square = NodeData::new1(BoxedNodeSend::new(SquareNode{}));
+    let out = NodeData::new1(BoxedNodeSend::new(SumNode{}));
+    // let sine = Box::new(signal::noise(0)) as Box<dyn Signal<Frame=f64>>;
+    // let mut sine = BoxedNodeSend::new(Box::new(signal::rate(48000.0).const_hz(440.0).sine()) as Box<dyn Signal<Frame=f64>>);
+    let square_idx = g.add_node(square);
+    let out_idx = g.add_node(out);
+    g.add_edge(square_idx, out_idx, ());
 
 
 
@@ -110,21 +128,24 @@ pub extern fn audioloop() -> *mut AudioSystem {
             let mut raw_sample:f32;
             let stream_input = Arc::clone(&stream_input);
             let midi_input = &stream_input.read().unwrap().notes;
+
+            p.process(&mut g, out_idx);
+
             for sample in data.iter_mut() {
                 n+=1;
                 raw_sample = 0.0;
-                for input in midi_input.iter() {
-                    let freq: u32 = MIDI_FREQS[input.note as usize] as u32;
-                    let wavelength = sample_rate.0 / freq;
-                    if n>wavelength {
-                        raw_sample += 0.0;
-                    } else {
-                        raw_sample += 0.5 * MIDI_VOLS[input.velocity as usize];
-                    }
-                    if n>wavelength*2 {
-                        n=0;
-                    }
-                }
+                // for input in midi_input.iter() {
+                //     let freq: u32 = MIDI_FREQS[input.note as usize] as u32;
+                //     let wavelength = sample_rate.0 / freq;
+                //     if n>wavelength {
+                //         raw_sample += 0.0;
+                //     } else {
+                //         raw_sample += 0.5 * MIDI_VOLS[input.velocity as usize];
+                //     }
+                //     if n>wavelength*2 {
+                //         n=0;
+                //     }
+                // }
                 *sample = Sample::from(&raw_sample);
             
             }
