@@ -8,3 +8,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 cpal = { version = "*" }
+dasp_graph = { version = "*"}

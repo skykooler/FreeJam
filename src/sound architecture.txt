@@ -1,0 +1,16 @@
+track audio -> effect network -> volume/pan (internally part of network) -> added to other track samples
+
+track types:
+- recorded
+- sample
+- multisample
+- synth
+
+effects:
+- reverb
+- echo
+- distortion
+- pitch shift
+- equalizer
+- delay
+- ...guitar amps
