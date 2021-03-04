@@ -6,9 +6,9 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::{Arc, RwLock};
 use dasp_graph::{Node, NodeData, Buffer, Input, BoxedNodeSend};
 use dasp_graph::node::Sum as SumNode;
-use dasp_signal::{self as signal, Signal};
+// use dasp_signal::{self as signal, Signal};
 // use dasp_frame::Frame;
-use dasp_slice;
+// use dasp_slice;
 use petgraph;
 // use std::time::Duration;
 // use std::thread;
@@ -64,15 +64,17 @@ struct MidiInput {
     notes: Vec<MidiNote>
 }
 
+// Our new `Node` type.
 pub struct SquareNode;
 
+// Implement the `Node` trait for our new type.
 impl Node for SquareNode {
     fn process(&mut self, inputs: &[Input], output: &mut [Buffer]) {
         // Fill the output with silence.
         for out_buffer in output.iter_mut() {
             out_buffer.silence();
         }
-        let mut n=0;
+        // Sum the inputs onto the output.
         let wavelength = 100;
         for (channel, out_buffer) in output.iter_mut().enumerate() {
             *out_buffer = Buffer::from([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,
@@ -124,16 +126,27 @@ pub extern fn audioloop() -> *mut AudioSystem {
     let stream = output_device.build_output_stream(
         &config,
         move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-            let mut n:u32 = 0;
-            let mut raw_sample:f32;
-            let stream_input = Arc::clone(&stream_input);
-            let midi_input = &stream_input.read().unwrap().notes;
+            // println!("{}", data.len());
+            // let mut n:u32 = 0;
+            // let mut raw_sample:f32;
+            let mut idx: usize = 0;
+            // let stream_input = Arc::clone(&stream_input);
+            // let midi_input = &stream_input.read().unwrap().notes;
 
             p.process(&mut g, out_idx);
 
             for sample in data.iter_mut() {
-                n+=1;
-                raw_sample = 0.0;
+                // n+=1;
+                idx+=1;
+                let out = &mut g[out_idx];
+                if idx >= out.buffers[0].len() {
+                    p.process(&mut g, out_idx);
+                    idx = 0;
+                }
+                let out = &mut g[out_idx]; // it's the same output node, but reborrowed so that we could process the graph above if necessary
+                *sample = Sample::from(out.buffers[0].get(idx).unwrap());
+
+                // raw_sample = 0.0;
                 // for input in midi_input.iter() {
                 //     let freq: u32 = MIDI_FREQS[input.note as usize] as u32;
                 //     let wavelength = sample_rate.0 / freq;
@@ -146,7 +159,7 @@ pub extern fn audioloop() -> *mut AudioSystem {
                 //         n=0;
                 //     }
                 // }
-                *sample = Sample::from(&raw_sample);
+                // *sample = Sample::from(&raw_sample);
             
             }
         },
