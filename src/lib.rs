@@ -1,7 +1,7 @@
 #![crate_type = "dylib"]
 
 extern crate cpal;
-use cpal::{Sample, Stream};
+use cpal::{Sample, Stream, SampleRate};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::{Arc, RwLock};
 use dasp_graph::{Node, NodeData, Buffer, Input, BoxedNodeSend};
@@ -12,6 +12,8 @@ use dasp_graph::node::Sum as SumNode;
 use petgraph;
 // use std::time::Duration;
 // use std::thread;
+
+type ShareableMidiInputArray = Arc<RwLock<[bool; 128]>>;
 
 const MIDI_FREQS: [f32; 127] = [8.175798915643707, 8.661957218027252, 9.177023997418987, 9.722718241315029, 10.300861153527185,
     10.913382232281371, 11.562325709738575, 12.249857374429665, 12.978271799373285, 13.75, 14.56761754744031,
@@ -51,7 +53,8 @@ pub struct AudioSystem {
     stream: Stream,
     current_time: i32,
     timeline_time: i32,
-    input: Arc<RwLock<MidiInput>>
+    input: Arc<RwLock<MidiInput>>,
+    current_track_midi_inputs: ShareableMidiInputArray,
 }
 
 struct MidiNote {
@@ -64,22 +67,55 @@ struct MidiInput {
     notes: Vec<MidiNote>
 }
 
+struct MidiTrack {
+    inputs: ShareableMidiInputArray,
+
+}
+
 // Our new `Node` type.
-pub struct SquareNode;
+pub struct SquareNode {
+    inputs: ShareableMidiInputArray,
+    sample_rate: SampleRate,
+    counter: u32,
+}
 
 // Implement the `Node` trait for our new type.
 impl Node for SquareNode {
     fn process(&mut self, inputs: &[Input], output: &mut [Buffer]) {
+        // Make sure the counter doesn't overflow by resetting it every twelve hours
+        if self.counter > (2 << 30) {
+            println!("Resetting counter! Current value: {}", self.counter);
+            self.counter = 0;
+        }
         // Fill the output with silence.
         for out_buffer in output.iter_mut() {
             out_buffer.silence();
         }
         // Sum the inputs onto the output.
+        let mut n: u32 = self.counter;
         let wavelength = 100;
         for (channel, out_buffer) in output.iter_mut().enumerate() {
-            *out_buffer = Buffer::from([0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,
-                1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0])
+            n = self.counter;
+            for sample in out_buffer.iter_mut() {
+                n += 1;
+                for (note, input) in self.inputs.read().unwrap().iter().enumerate() {
+                    if *input {
+                        let freq: u32 = MIDI_FREQS[note as usize] as u32;
+                        let wavelength = self.sample_rate.0 / freq;
+                        if n%wavelength > wavelength / 2 {
+                            *sample += 0.0;
+                        } else {
+                            // TODO: fixthis
+                            // raw_sample += 0.5 * MIDI_VOLS[input.velocity as usize];
+                            *sample += 0.5 * MIDI_VOLS[120];
+                        }
+                        // if n>(wavelength*2) {
+                        //     n=0;
+                        // }
+                    }
+                }
         }
+        self.counter = n;
     }
 }
 
@@ -107,12 +143,15 @@ pub extern fn audioloop() -> *mut AudioSystem {
     println!("{:?}", sample_rate);
     let config = supported_config.into();
 
+    // TEMPORARY TESTING HARDCODED STUFF
+    let track1inputs = Arc::new(RwLock::new( [false; 128]));
+    let track1: MidiTrack = MidiTrack { inputs: Arc::clone(&track1inputs) };
 
     let max_nodes = 1024;
     let max_edges = 1024;
     let mut g = Graph::with_capacity(max_nodes, max_edges);
     let mut p = Processor::with_capacity(max_nodes);
-    let square = NodeData::new1(BoxedNodeSend::new(SquareNode{}));
+    let square = NodeData::new1(BoxedNodeSend::new(SquareNode{ inputs: Arc::clone(&track1inputs), sample_rate: sample_rate.clone(), counter: 0 }));
     let out = NodeData::new1(BoxedNodeSend::new(SumNode{}));
     // let sine = Box::new(signal::noise(0)) as Box<dyn Signal<Frame=f64>>;
     // let mut sine = BoxedNodeSend::new(Box::new(signal::rate(48000.0).const_hz(440.0).sine()) as Box<dyn Signal<Frame=f64>>);
@@ -172,7 +211,8 @@ pub extern fn audioloop() -> *mut AudioSystem {
         stream: stream,
         current_time: 0,
         timeline_time: 0,
-        input: streamarc
+        input: streamarc,
+        current_track_midi_inputs: Arc::clone(&track1inputs)
     };
     asys.stream.play().unwrap();
     let boxed_stream = Box::new(asys);
@@ -210,6 +250,7 @@ pub extern fn play_note(ptr: *mut AudioSystem, note: i8, velocity: i8) -> *mut A
 
     let asys = unsafe { Box::from_raw(ptr) };
     asys.input.write().unwrap().notes.push(MidiNote { note: note, velocity: velocity, start_time: asys.current_time});
+    asys.current_track_midi_inputs.write().unwrap()[note as usize] = true;
     Box::into_raw(asys)
 }
 
@@ -226,5 +267,6 @@ pub extern fn stop_note(ptr: *mut AudioSystem, note: i8) -> *mut AudioSystem {
             notes.swap_remove(pos);
         }
     }
+    asys.current_track_midi_inputs.write().unwrap()[note as usize] = false;
     Box::into_raw(asys)
 }
