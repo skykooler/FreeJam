@@ -114,6 +114,7 @@ impl Node for SquareNode {
                         // }
                     }
                 }
+            }
         }
         self.counter = n;
     }
