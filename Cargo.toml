@@ -16,4 +16,5 @@ dasp_signal = { version = "*" }
 petgraph = { version = "*" }
 
 [dependencies.dasp_graph]
+version = "*"
 features = ["node-boxed", "node-graph", "node-signal", "node-delay", "node-sum"]
