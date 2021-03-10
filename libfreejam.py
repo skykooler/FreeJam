@@ -31,6 +31,10 @@ class AudioSystem:
     
     def stop_note(self, note):
         self._stream = self._lib.stop_note(self._stream, note)
+    
+    def stop_all_notes(self):
+        for i in range(128):
+            self._stream = self._lib.stop_note(self._stream, i)
 
     def hit_note(self, note, velocity, ms):
         self.play_note(note, velocity)
