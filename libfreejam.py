@@ -1,5 +1,5 @@
 # TODO: un-hardcode this path
-LIB_PATH = "./target/debug/freejam.dll"
+LIB_PATH = "./target/debug/libfreejam.so"
 
 import cffi
 import os
@@ -14,8 +14,8 @@ class AudioSystem:
         void* audioloop();
         void* play(void *stream);
         void* pause(void *stream);
-        void* play_note(void *stream, UINT8 note, UINT8 velocity);
-        void* stop_note(void *stream, UINT8 note);
+        void* play_note(void *stream, uint8_t note, uint8_t velocity);
+        void* stop_note(void *stream, uint8_t note);
         """)
 
         self._stream = self._lib.audioloop()
