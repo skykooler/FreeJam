@@ -166,6 +166,22 @@ class Instrument {
             this.sampler.releaseAll()
         }
     }
+    sync() {
+        if (this.type == "synth" || this.type == "polysynth") {
+            this.synth.sync()
+        } else if (this.type == "sampled") {
+            console.log("syncing")
+            this.sampler.sync()
+        }
+    }
+    unsync() {
+        if (this.type == "synth" || this.type == "polysynth") {
+            this.synth.unsync()
+        } else if (this.type == "sampled") {
+            console.log("unsyncing")
+            this.sampler.unsync()
+        }
+    }
 }
 class Track {
     constructor (name, instrument) {
@@ -179,7 +195,7 @@ class Track {
             <div class="track_controls">
                 <button class="toggle_mute">Toggle Mute</button>
                 <button class="toggle_solo">Toggle Solo</button>
-                <input type="range" min="0" max="1.5" value="1" />
+                <input type="range" min="0" max="1.5" value="1" step="0.01" />
             </div>`
         document.querySelector('.trackheaders')?.appendChild(this.trackheader)
         this.track = document.createElement('div')
@@ -194,7 +210,9 @@ class Track {
         var ref;
         var rec;
         if (recording) {
-            ref = Tone.Transport.schedule((time) => { this.instrument.play_note(note); }, Tone.Transport.position)
+            this.instrument.play_note(note)
+            // ref = Tone.Transport.schedule((time) => { this.instrument.play_note(note); }, Tone.Transport.position)
+            ref = 1
             rec = [Tone.Transport.seconds, ref, note]
             this.activeBuffer?.push(rec)
             this.active_notes[note] = rec
@@ -205,13 +223,13 @@ class Track {
     release_note(note) {
         var ref;
         if (recording) {
-            ref = Tone.Transport.schedule((time) => { this.instrument.release_note(note); }, Tone.Transport.position)
+            // ref = Tone.Transport.schedule((time) => { this.instrument.release_note(note); }, Tone.Transport.position)
             if (note in this.active_notes) {
                 this.active_notes[note][3] = Tone.Transport.seconds - this.active_notes[note][0]
             }
-        } else {
-            this.instrument.release_note(note)
         }
+        // } else {
+            this.instrument.release_note(note)
     }
     release_all() {
         var ref;
@@ -238,6 +256,10 @@ class Track {
             canvas: canvas
         })
         this.activeBuffer = buf
+        this.instrument.sync()
+    }
+    stopRecording() {
+        this.instrument.unsync()
     }
 }
 keysMapLayouts = {
@@ -345,6 +367,7 @@ document.querySelector('body')?.addEventListener('keyup', async (e) => {
 function playPause() {
     if (Tone.Transport.state == 'started') {
         active_track.release_all()
+        active_track.stopRecording()
         Tone.Transport.pause()
         recording = false
         document.querySelector('button.play').innerText = "Play"
@@ -355,6 +378,7 @@ function playPause() {
 }
 function stop() {
     active_track.release_all()
+    active_track.stopRecording()
     recording = false
     Tone.Transport.stop()
     lastDrawPos = 0
