@@ -62,10 +62,12 @@
             border-bottom: 1px solid black;
             min-width: 100%;
             height: 100px;
+            position: relative;
         }
         .trackroll {
             height: 100px;
             width: 10000px; /* TODO */
+            position: absolute;
         }
         .cursor {
             height: 100%;
@@ -84,11 +86,6 @@
                 <div class="trackheader"></div>
                 <div class="trackheader active"></div>
                 <div class="trackheader"></div>
-                <div class="trackheader"></div>
-                <div class="trackheader"></div>
-                <div class="trackheader"></div>
-                <div class="trackheader"></div>
-                <div class="trackheader"></div>
             </div>
             <div class="trackrolls">
                 <div class="cursor"></div>
@@ -96,11 +93,6 @@
                 <div class="track">
                     <canvas class="trackroll" width="10000px" height="100px"></canvas>
                 </div>
-                <div class="track"></div>
-                <div class="track"></div>
-                <div class="track"></div>
-                <div class="track"></div>
-                <div class="track"></div>
                 <div class="track"></div>
 
             </div>
@@ -112,6 +104,7 @@
         </div>
     </div>
 <script>
+tracks = []
 class Instrument {
     constructor (name, type, samples, filters) {
         this.name = name
@@ -173,6 +166,63 @@ class Instrument {
         }
     }
 }
+class Track {
+    constructor (name, instrument) {
+        this.name = name
+        this.instrument = instrument
+        this.trackheader = document.createElement('div')
+        this.trackheader.className = 'trackheader'
+        this.trackheader.innerHTML = `
+            <div class="logo"></div>
+            <div class="track_name">`+this.name+`</div>
+            <div class="track_controls">
+                <button class="toggle_mute">Toggle Mute</button>
+                <button class="toggle_solo">Toggle Solo</button>
+                <input type="range" min="0" max="1.5" value="1" />
+            </div>`
+        document.querySelector('.trackheaders')?.appendChild(this.trackheader)
+        this.track = document.createElement('div')
+        this.track.className = 'track'
+        document.querySelector('.trackrolls')?.appendChild(this.track)
+        tracks.push(this)
+        this.buffers = []
+        this.activeBuffer = undefined
+    }
+    play_note(note) {
+        var ref;
+        if (recording) {
+            ref = Tone.Transport.schedule((time) => { this.instrument.play_note(note); }, Tone.Transport.position)
+            this.activeBuffer?.push([Tone.Transport.seconds, ref, note, 'attack'])
+        } else {
+            this.instrument.play_note(note)
+        }
+    }
+    release_note(note) {
+        var ref;
+        if (recording) {
+            ref = Tone.Transport.schedule((time) => { this.instrument.release_note(note); }, Tone.Transport.position)
+            this.activeBuffer?.push([Tone.Transport.seconds, ref, note, 'release'])
+        } else {
+            this.instrument.release_note(note)
+        }
+    }
+    release_all() {
+        var ref;
+        if (recording) {
+            ref = Tone.Transport.schedule((time) => { this.instrument.release_all(); }, Tone.Transport.position)
+            for (let note of this.instrument.active_notes) {
+                this.activeBuffer?.push([Tone.Transport.seconds, ref, note, 'release'])
+            }
+        } else {
+            this.instrument.release_all()
+        }
+    }
+    startRecording() {
+        var buf = []
+        this.buffers.push(buf)
+        this.activeBuffer = buf
+    }
+}
 keysMapLayouts = {
     us: {
         KeyA:"C",
@@ -195,6 +245,9 @@ keysMapLayouts = {
         Quote:"F^",
         KeyZ: "-",
         KeyX: "+",
+        KeyR: "Record",
+        Space: "Play",
+        Escape: "Stop",
     }
 }
 keysMap = keysMapLayouts.us
@@ -227,11 +280,17 @@ document.querySelector('body')?.addEventListener('keydown', async (e) => {
     active_keys.add(e.code)
     note_base = keysMap[e.code]
     if (note_base) {
-        if ('-+'.indexOf(note_base)!=-1) {
+        if ('-+PlayRecordStop'.indexOf(note_base)!=-1) {
             if (note_base=='-' && octave > 1) {
                 octave--;
             } else if (note_base=='+' && octave < 7) {
                 octave++;
+            } else if (note_base == "Play") {
+                playPause()
+            } else if (note_base == "Record") {
+                record()
+            } else if (note_base == "Stop") {
+                stop()
             }
             return
         }
@@ -242,19 +301,22 @@ document.querySelector('body')?.addEventListener('keydown', async (e) => {
         } else {
             note = note + octave
         }
-        if (recording) {
-            var _note=note
-            var _active_track=active_track
-            Tone.Transport.schedule((time) => { _active_track.play_note(_note); }, Tone.Transport.position)
-        } else {
+        // if (recording) {
+        //     var _note=note
+        //     var _active_track=active_track
+        //     Tone.Transport.schedule((time) => { _active_track.play_note(_note); }, Tone.Transport.position)
+        // } else {
             active_track.play_note(note)
-        }
+        // }
     }
 })
 document.querySelector('body')?.addEventListener('keyup', async (e) => {
     active_keys.delete(e.code)
     note_base = keysMap[e.code]
     if (note_base) {
+        if ('-+PlayRecordStop'.indexOf(note_base)!=-1) {
+            return;
+        }
         note_array = note_base.split("^")
         note = note_array[0]
         if (note_array.length>1) {
@@ -262,40 +324,54 @@ document.querySelector('body')?.addEventListener('keyup', async (e) => {
         } else {
             note = note + octave
         }
-        if (recording) {
-            var _note=note
-            var _active_track=active_track
-            Tone.Transport.schedule((time) => { _active_track.release_note(_note); }, Tone.Transport.position)
-        } else {
+        // if (recording) {
+        //     var _note=note
+        //     var _active_track=active_track
+        //     Tone.Transport.schedule((time) => { _active_track.release_note(_note); }, Tone.Transport.position)
+        // } else {
             active_track.release_note(note)
-        }
+        // }
     }
 })
 
-// Playback control event handlers
-document.querySelector('button.record')?.addEventListener('click', async () => {
-    recording = !recording
-    console.log(Tone.Transport.now())
-    if (recording) {
-        Tone.Transport.start()
-    }
-    console.log("Recording: ", recording)
-})
-document.querySelector('button.stop')?.addEventListener('click', async () => {
-    recording = false
-    Tone.Transport.stop()
-    lastDrawPos = 0
-    active_track.release_all()
-        document.querySelector('button.play').innerText = "Play"
-})
-document.querySelector('button.play')?.addEventListener('click', async () => {
+function playPause() {
     if (Tone.Transport.state == 'started') {
+        active_track.release_all()
         Tone.Transport.pause()
+        recording = false
         document.querySelector('button.play').innerText = "Play"
     } else {
         Tone.Transport.start()
         document.querySelector('button.play').innerText = "Pause"
     }
+}
+function stop() {
+    active_track.release_all()
+    recording = false
+    Tone.Transport.stop()
+    lastDrawPos = 0
+    document.querySelector('button.play').innerText = "Play"
+}
+function record() {
+    recording = !recording
+    if (recording) {
+        Tone.Transport.start()
+        active_track.startRecording()
+    } else {
+        active_track.stopRecording()
+    }
+    console.log("Recording: ", recording)
+}
+
+// Playback control event handlers
+document.querySelector('button.record')?.addEventListener('click', async () => {
+    record()
+})
+document.querySelector('button.stop')?.addEventListener('click', async () => {
+    stop()
+})
+document.querySelector('button.play')?.addEventListener('click', async () => {
+    playPause()
 })
 
 function drawActiveTrack() {
@@ -307,9 +383,8 @@ function drawActiveTrack() {
         ctx.lineStyle="none"
         ctx.fillRect(lastDrawPos,0,delta,100)
         ctx.fillStyle = "rgba(0,0,0,1)"
-        for (let i of active_track.active_notes) {
+        for (let i of active_track.instrument.active_notes) {
             pos = notePosition[i] * 100 // TODO: unhardcode scaling
-            console.log(pos)
             ctx.fillRect(lastDrawPos,pos,delta,4)
         }
     }
@@ -320,7 +395,8 @@ function drawActiveTrack() {
 
 
 // temporary hardcoded initialization
-active_track = new Instrument('foo', 'sampled', {C4:"C4.mp3", A4: "A4.mp3", C5: "C5.mp3"})
+instrument = new Instrument('foo', 'sampled', {C4:"C4.mp3", A4: "A4.mp3", C5: "C5.mp3"})
+active_track = new Track("Piano2", instrument)
 active_canvas = document.querySelector('canvas.trackroll')
 
 drawActiveTrack()
