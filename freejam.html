@@ -66,7 +66,7 @@
         }
         .trackroll {
             height: 100px;
-            width: 10000px; /* TODO */
+            width: 10px; /* TODO */
             position: absolute;
         }
         .cursor {
@@ -74,6 +74,7 @@
             width:0;
             position: absolute;
             border-left: 1px solid red;
+            z-index: 1;
         }
     </style>
 <script src="webaudio/tone.js"></script>
@@ -187,12 +188,16 @@ class Track {
         tracks.push(this)
         this.buffers = []
         this.activeBuffer = undefined
+        this.active_notes = {}
     }
     play_note(note) {
         var ref;
+        var rec;
         if (recording) {
             ref = Tone.Transport.schedule((time) => { this.instrument.play_note(note); }, Tone.Transport.position)
-            this.activeBuffer?.push([Tone.Transport.seconds, ref, note, 'attack'])
+            rec = [Tone.Transport.seconds, ref, note]
+            this.activeBuffer?.push(rec)
+            this.active_notes[note] = rec
         } else {
             this.instrument.play_note(note)
         }
@@ -201,7 +206,9 @@ class Track {
         var ref;
         if (recording) {
             ref = Tone.Transport.schedule((time) => { this.instrument.release_note(note); }, Tone.Transport.position)
-            this.activeBuffer?.push([Tone.Transport.seconds, ref, note, 'release'])
+            if (note in this.active_notes) {
+                this.active_notes[note][3] = Tone.Transport.seconds - this.active_notes[note][0]
+            }
         } else {
             this.instrument.release_note(note)
         }
@@ -219,7 +226,17 @@ class Track {
     }
     startRecording() {
         var buf = []
-        this.buffers.push(buf)
+        var canvas = document.createElement('canvas')
+        canvas.width = 10
+        canvas.height = 100
+        canvas.className = "trackroll"
+        this.track.appendChild(canvas)
+        active_canvas = canvas
+        this.buffers.push({
+            buffer: buf,
+            start: Tone.Transport.seconds,
+            canvas: canvas
+        })
         this.activeBuffer = buf
     }
 }
@@ -254,10 +271,13 @@ keysMap = keysMapLayouts.us
 octave = 4
 active_track = undefined
 active_keys = new Set()
+active_canvas = undefined
 recording = false
 notePosition = {}
 lastDrawPos = 0
 noteNames = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B']
+xScalingFactor = 100
+yScalingFactor = 100
 for (let i in noteNames) {
     for (let j of [1,2,3,4,5,6,7,8]) {
         notePosition[noteNames[i]+j] = 1 - (i/24 + j%2/2) - 1/24
@@ -301,13 +321,7 @@ document.querySelector('body')?.addEventListener('keydown', async (e) => {
         } else {
             note = note + octave
         }
-        // if (recording) {
-        //     var _note=note
-        //     var _active_track=active_track
-        //     Tone.Transport.schedule((time) => { _active_track.play_note(_note); }, Tone.Transport.position)
-        // } else {
-            active_track.play_note(note)
-        // }
+        active_track.play_note(note)
     }
 })
 document.querySelector('body')?.addEventListener('keyup', async (e) => {
@@ -324,13 +338,7 @@ document.querySelector('body')?.addEventListener('keyup', async (e) => {
         } else {
             note = note + octave
         }
-        // if (recording) {
-        //     var _note=note
-        //     var _active_track=active_track
-        //     Tone.Transport.schedule((time) => { _active_track.release_note(_note); }, Tone.Transport.position)
-        // } else {
-            active_track.release_note(note)
-        // }
+        active_track.release_note(note)
     }
 })
 
@@ -375,16 +383,30 @@ document.querySelector('button.play')?.addEventListener('click', async () => {
 })
 
 function drawActiveTrack() {
-    x = parseInt(Tone.Transport.seconds * 100)
+    x = parseInt(Tone.Transport.seconds * xScalingFactor)
     delta = x-lastDrawPos
-    ctx = active_canvas.getContext("2d")
+    width = Math.max(10, x)
     if(recording) {
+        ctx = active_canvas?.getContext("2d")
+        if (width > active_canvas.width) {
+            active_canvas.width += 100
+            active_canvas.style.width = active_canvas.width+"px"
+
+            ctx.fillStyle="rgba(200,200,200,1)"
+            ctx.lineStyle="none"
+            ctx.fillRect(0,0, width, yScalingFactor)
+            ctx.fillStyle = "rgba(0,0,0,1)"
+            for (let note of active_track.activeBuffer) {
+                pos = notePosition[note[2]] * yScalingFactor // TODO: scaling
+                ctx.fillRect(note[0] * xScalingFactor, pos, note[3]*xScalingFactor||(x-note[0]*xScalingFactor), 4)
+            }
+        }
         ctx.fillStyle="rgba(200,200,200,1)"
         ctx.lineStyle="none"
-        ctx.fillRect(lastDrawPos,0,delta,100)
+        ctx.fillRect(lastDrawPos,0,delta,yScalingFactor)
         ctx.fillStyle = "rgba(0,0,0,1)"
         for (let i of active_track.instrument.active_notes) {
-            pos = notePosition[i] * 100 // TODO: unhardcode scaling
+            pos = notePosition[i] * yScalingFactor // TODO: unhardcode scaling
             ctx.fillRect(lastDrawPos,pos,delta,4)
         }
     }
@@ -397,7 +419,7 @@ function drawActiveTrack() {
 // temporary hardcoded initialization
 instrument = new Instrument('foo', 'sampled', {C4:"C4.mp3", A4: "A4.mp3", C5: "C5.mp3"})
 active_track = new Track("Piano2", instrument)
-active_canvas = document.querySelector('canvas.trackroll')
+// active_canvas = document.querySelector('canvas.trackroll')
 
 drawActiveTrack()
 </script>
