@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            padding: 0;
+            margin: 0;
+        }
+        .main {
+            display: grid;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            grid-template-columns: 1fr;
+            grid-template-rows: 100px 1fr 100px;
+            grid-column-gap: 0px;
+            grid-row-gap: 0px;
+        }
+
+        .header {
+            grid-area: 1 / 1 / 2 / 2;
+            background-color: #aaa;
+        }
+        .tracks {
+            grid-area: 2 / 1 / 3 / 2;
+            overflow-y: auto;
+        }
+        .controls { 
+            grid-area: 3 / 1 / 4 / 2; 
+            background-color: #aaa;
+        }
+        .tracks {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            grid-template-rows: 1fr;
+            grid-column-gap: 0px;
+            grid-row-gap: 0px;
+        }
+
+        .trackheaders {
+            grid-area: 1 / 1 / 2 / 2;
+            background-color: cyan;
+        }
+        .trackrolls {
+            grid-area: 1 / 2 / 2 / 3;
+            overflow-x: auto;
+            position: relative;
+        }
+        .trackheader {
+            width: 100%;
+            height: 100px;
+            box-sizing: border-box;
+            border-top: 3px solid white;
+            border-bottom: 3px solid black;
+            background-color:blueviolet;
+        }
+        .trackheader.active {
+            background-color:chocolate;
+        }
+        .track {
+            box-sizing: border-box;
+            border-bottom: 1px solid black;
+            min-width: 100%;
+            height: 100px;
+        }
+        .trackroll {
+            height: 100px;
+            width: 10000px; /* TODO */
+        }
+        .cursor {
+            height: 100%;
+            width:0;
+            position: absolute;
+            border-left: 1px solid red;
+        }
+    </style>
+<script src="webaudio/tone.js"></script>
+</head>
+<body>
+    <div class="main">
+        <div class="header"></div>
+        <div class="tracks">
+            <div class="trackheaders">
+                <div class="trackheader"></div>
+                <div class="trackheader active"></div>
+                <div class="trackheader"></div>
+                <div class="trackheader"></div>
+                <div class="trackheader"></div>
+                <div class="trackheader"></div>
+                <div class="trackheader"></div>
+                <div class="trackheader"></div>
+            </div>
+            <div class="trackrolls">
+                <div class="cursor"></div>
+                <div class="track"></div>
+                <div class="track">
+                    <canvas class="trackroll" width="10000px" height="100px"></canvas>
+                </div>
+                <div class="track"></div>
+                <div class="track"></div>
+                <div class="track"></div>
+                <div class="track"></div>
+                <div class="track"></div>
+                <div class="track"></div>
+
+            </div>
+        </div>
+        <div class="controls">
+            <button class="record">Record</button>
+            <button class="play">Play</button>
+            <button class="stop">Stop</button>
+        </div>
+    </div>
+<script>
+class Instrument {
+    constructor (name, type, samples, filters) {
+        this.name = name
+        this.type = type
+        this.active_key = undefined
+        this.active_notes = new Set()
+        // Possible types include synth, polysynth, sampled, and recorded
+        if (type=="synth") {
+            this.synth = new Tone.Synth().toDestination()
+        } else if (type=="polysynth") {
+            this.synth = new Tone.PolySynth(Tone.Synth).toDestination()
+        } else if (type=="sampled") {
+            this.sampler = new Tone.Sampler({
+                urls: samples,
+                release: 1, // TODO: don't hardcode this
+                baseUrl: "instruments/keyboards/piano2/", // TODO: don't hardcode this either
+            }).toDestination()
+            Tone.loaded().then(() => {
+                this.loaded = true
+            })
+        }
+    }
+    play_note(note) {
+        if (this.type == "synth" || this.type == "polysynth") {
+            this.synth.triggerAttack(note)
+            this.active_key = note
+            if (this.type=="synth") {
+                this.active_notes.clear()
+            }
+            this.active_notes.add(note)
+            console.log(this.active_notes)
+        } else if (this.type == "sampled" && this.loaded) {
+            this.sampler.triggerAttack(note)
+            this.active_notes.add(note)
+        }
+    }
+    release_note(note) {
+        if (this.type == "synth") {
+            if (this.active_key == note) {
+                this.synth.triggerRelease()
+                this.active_key = undefined
+                this.active_notes.clear()
+            }
+        } else if (this.type == "polysynth") {
+            this.synth.triggerRelease(note)
+            this.active_notes.delete(note)
+        } else if (this.type == "sampled") {
+            this.sampler.triggerRelease(note)
+            this.active_notes.delete(note)
+        }
+    }
+    release_all() {
+        if (this.type == 'synth') {
+            this.synth.triggerRelease()
+        } else if (this.type == 'polysynth') {
+            this.synth.releaseAll()
+        } else if (this.type == "sampled") {
+            this.sampler.releaseAll()
+        }
+    }
+}
+keysMapLayouts = {
+    us: {
+        KeyA:"C",
+        KeyW:"C#",
+        KeyS:"D",
+        KeyE:"Eb",
+        KeyD:"E",
+        KeyF:"F",
+        KeyT:"F#",
+        KeyG:"G",
+        KeyY:"Ab",
+        KeyH:"A",
+        KeyU:"Bb",
+        KeyJ:"B",
+        KeyK:"C^",
+        KeyO:"C#^^",
+        KeyL:"D^",
+        KeyP:"Eb^",
+        Semicolon:"E^",
+        Quote:"F^",
+        KeyZ: "-",
+        KeyX: "+",
+    }
+}
+keysMap = keysMapLayouts.us
+octave = 4
+active_track = undefined
+active_keys = new Set()
+recording = false
+notePosition = {}
+lastDrawPos = 0
+noteNames = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B']
+for (let i in noteNames) {
+    for (let j of [1,2,3,4,5,6,7,8]) {
+        notePosition[noteNames[i]+j] = 1 - (i/24 + j%2/2) - 1/24
+    }
+}
+
+//attach a click listener to a play button
+document.querySelector('body')?.addEventListener('click', async () => {
+    if (Tone.context.state === "suspended") {
+        await Tone.start()
+    }
+})
+
+//Virtual Keyboard event handlers
+document.querySelector('body')?.addEventListener('keydown', async (e) => {
+    if (Tone.context.state === "suspended") {
+        await Tone.start()
+    }
+    if (active_keys.has(e.code)) return;
+    active_keys.add(e.code)
+    note_base = keysMap[e.code]
+    if (note_base) {
+        if ('-+'.indexOf(note_base)!=-1) {
+            if (note_base=='-' && octave > 1) {
+                octave--;
+            } else if (note_base=='+' && octave < 7) {
+                octave++;
+            }
+            return
+        }
+        note_array = note_base.split("^")
+        note = note_array[0]
+        if (note_array.length>1) {
+            note = note + (octave+1)
+        } else {
+            note = note + octave
+        }
+        if (recording) {
+            var _note=note
+            var _active_track=active_track
+            Tone.Transport.schedule((time) => { _active_track.play_note(_note); }, Tone.Transport.position)
+        } else {
+            active_track.play_note(note)
+        }
+    }
+})
+document.querySelector('body')?.addEventListener('keyup', async (e) => {
+    active_keys.delete(e.code)
+    note_base = keysMap[e.code]
+    if (note_base) {
+        note_array = note_base.split("^")
+        note = note_array[0]
+        if (note_array.length>1) {
+            note = note + (octave+1)
+        } else {
+            note = note + octave
+        }
+        if (recording) {
+            var _note=note
+            var _active_track=active_track
+            Tone.Transport.schedule((time) => { _active_track.release_note(_note); }, Tone.Transport.position)
+        } else {
+            active_track.release_note(note)
+        }
+    }
+})
+
+// Playback control event handlers
+document.querySelector('button.record')?.addEventListener('click', async () => {
+    recording = !recording
+    console.log(Tone.Transport.now())
+    if (recording) {
+        Tone.Transport.start()
+    }
+    console.log("Recording: ", recording)
+})
+document.querySelector('button.stop')?.addEventListener('click', async () => {
+    recording = false
+    Tone.Transport.stop()
+    lastDrawPos = 0
+    active_track.release_all()
+        document.querySelector('button.play').innerText = "Play"
+})
+document.querySelector('button.play')?.addEventListener('click', async () => {
+    if (Tone.Transport.state == 'started') {
+        Tone.Transport.pause()
+        document.querySelector('button.play').innerText = "Play"
+    } else {
+        Tone.Transport.start()
+        document.querySelector('button.play').innerText = "Pause"
+    }
+})
+
+function drawActiveTrack() {
+    x = parseInt(Tone.Transport.seconds * 100)
+    delta = x-lastDrawPos
+    ctx = active_canvas.getContext("2d")
+    if(recording) {
+        ctx.fillStyle="rgba(200,200,200,1)"
+        ctx.lineStyle="none"
+        ctx.fillRect(lastDrawPos,0,delta,100)
+        ctx.fillStyle = "rgba(0,0,0,1)"
+        for (let i of active_track.active_notes) {
+            pos = notePosition[i] * 100 // TODO: unhardcode scaling
+            console.log(pos)
+            ctx.fillRect(lastDrawPos,pos,delta,4)
+        }
+    }
+    document.querySelector('.cursor').style.left = x + 'px'
+    lastDrawPos = x
+    requestAnimationFrame(drawActiveTrack)
+}
+
+
+// temporary hardcoded initialization
+active_track = new Instrument('foo', 'sampled', {C4:"C4.mp3", A4: "A4.mp3", C5: "C5.mp3"})
+active_canvas = document.querySelector('canvas.trackroll')
+
+drawActiveTrack()
+</script>
+</body>
+</html>
