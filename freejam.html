@@ -32,19 +32,44 @@
         .tracks {
             display: grid;
             grid-template-columns: 300px 1fr;
-            grid-template-rows: 1fr;
+            grid-template-rows: 30px 1fr;
             grid-column-gap: 0px;
             grid-row-gap: 0px;
         }
+        .headersheader {
+            grid-area: 1 / 1 / 2 / 2;
+            background-color: aquamarine;
+        }
+        .rollsheader {
+            height: 30px;
+            width: auto;
+            background-color: green;
+            position: relative;
+        }
+        cursortop {
+            height: 100%;
+            width: 10px;
+            margin-left: -5px;
+            position: absolute;
+            background-color: black;
+            z-index: 2;
+        }
 
         .trackheaders {
-            grid-area: 1 / 1 / 2 / 2;
+            grid-area: 2 / 1 / 3 / 2;
             background-color: cyan;
         }
         .trackrolls {
-            grid-area: 1 / 2 / 2 / 3;
+            grid-area: 1 / 2 / 3 / 3;
             overflow-x: auto;
             position: relative;
+        }
+        .trackrollwrapper {
+            min-width: 100%;
+            min-height:100%;
+            position: relative;
+            background-size: 100px;
+            background-image:  repeating-linear-gradient(to right, #444cf7, #444cf7 1px, #e5e5f7 1px, #e5e5f7);
         }
         .trackheader {
             width: 100%;
@@ -69,7 +94,7 @@
             width: 10px; /* TODO */
             position: absolute;
         }
-        .cursor {
+        cursor {
             height: 100%;
             width:0;
             position: absolute;
@@ -83,18 +108,24 @@
     <div class="main">
         <div class="header"></div>
         <div class="tracks">
+            <div class="headersheader"></div>
             <div class="trackheaders">
                 <div class="trackheader"></div>
                 <div class="trackheader active"></div>
                 <div class="trackheader"></div>
             </div>
             <div class="trackrolls">
-                <div class="cursor"></div>
-                <div class="track"></div>
-                <div class="track">
-                    <canvas class="trackroll" width="10000px" height="100px"></canvas>
+                <div class="trackrollwrapper">
+                    <cursor></cursor>
+                    <div class="rollsheader">
+                        <cursortop></cursortop>
+                    </div>
+                    <div class="track"></div>
+                    <div class="track">
+                        <canvas class="trackroll" width="10000px" height="100px"></canvas>
+                    </div>
+                    <div class="track"></div>
                 </div>
-                <div class="track"></div>
 
             </div>
         </div>
@@ -105,6 +136,9 @@
         </div>
     </div>
 <script>
+// jQuery in 50 bytes, booya
+function $(x) { return document.querySelector(x) }
+
 tracks = []
 class Instrument {
     constructor (name, type, samples, filters) {
@@ -189,10 +223,10 @@ class Track {
                 <button class="toggle_solo">Toggle Solo</button>
                 <input type="range" min="0" max="1.5" value="1" step="0.01" />
             </div>`
-        document.querySelector('.trackheaders')?.appendChild(this.trackheader)
+        $('.trackheaders')?.appendChild(this.trackheader)
         this.track = document.createElement('div')
         this.track.className = 'track'
-        document.querySelector('.trackrolls')?.appendChild(this.track)
+        $('.trackrollwrapper')?.appendChild(this.track)
         tracks.push(this)
         this.buffers = []
         this.activeBuffer = undefined
@@ -233,6 +267,7 @@ class Track {
         canvas.width = 10
         canvas.height = 100
         canvas.className = "trackroll"
+        canvas.draggable = true
         this.track.appendChild(canvas)
         canvas.style.left = Tone.Transport.seconds * xScalingFactor + "px"
         active_canvas = canvas
@@ -287,6 +322,7 @@ active_keys = new Set()
 active_canvas = undefined
 recording = false
 notePosition = {}
+autoscroll = false
 lastDrawPos = 0
 noteNames = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B']
 xScalingFactor = 100
@@ -298,14 +334,14 @@ for (let i in noteNames) {
 }
 
 //attach a click listener to a play button
-document.querySelector('body')?.addEventListener('click', async () => {
+$('body')?.addEventListener('click', async () => {
     if (Tone.context.state === "suspended") {
         await Tone.start()
     }
 })
 
 //Virtual Keyboard event handlers
-document.querySelector('body')?.addEventListener('keydown', async (e) => {
+$('body')?.addEventListener('keydown', async (e) => {
     if (Tone.context.state === "suspended") {
         await Tone.start()
     }
@@ -337,7 +373,7 @@ document.querySelector('body')?.addEventListener('keydown', async (e) => {
         active_track.play_note(note)
     }
 })
-document.querySelector('body')?.addEventListener('keyup', async (e) => {
+$('body')?.addEventListener('keyup', async (e) => {
     active_keys.delete(e.code)
     note_base = keysMap[e.code]
     if (note_base) {
@@ -361,10 +397,11 @@ function playPause() {
         active_track.stopRecording()
         Tone.Transport.pause()
         recording = false
-        document.querySelector('button.play').innerText = "Play"
+        $('button.play').innerText = "Play"
     } else {
         Tone.Transport.start()
-        document.querySelector('button.play').innerText = "Pause"
+        $('button.play').innerText = "Pause"
+        autoscroll = true
     }
 }
 function stop() {
@@ -373,13 +410,14 @@ function stop() {
     recording = false
     Tone.Transport.stop()
     lastDrawPos = 0
-    document.querySelector('button.play').innerText = "Play"
+    $('button.play').innerText = "Play"
 }
 function record() {
     recording = !recording
     if (recording) {
         Tone.Transport.start()
         active_track.startRecording()
+        autoscroll = true
     } else {
         active_track.stopRecording()
     }
@@ -387,13 +425,13 @@ function record() {
 }
 
 // Playback control event handlers
-document.querySelector('button.record')?.addEventListener('click', async () => {
+$('button.record')?.addEventListener('click', async () => {
     record()
 })
-document.querySelector('button.stop')?.addEventListener('click', async () => {
+$('button.stop')?.addEventListener('click', async () => {
     stop()
 })
-document.querySelector('button.play')?.addEventListener('click', async () => {
+$('button.play')?.addEventListener('click', async () => {
     playPause()
 })
 
@@ -426,20 +464,38 @@ function drawActiveTrack() {
             ctx.fillRect(lastDrawPos,pos,delta,4)
         }
     }
-    document.querySelector('.cursor').style.left = x + offset + 'px'
-    document.querySelector(".cursor").scrollIntoView({
-        behavior: 'smooth',
-        inline: 'center'
-    })
+    $('.trackrollwrapper').style.width = Math.max($('.trackrollwrapper').offsetWidth, x + offset + 200) + "px"
+    $('cursortop').style.left = x + offset + 'px'
+    $('cursor').style.left = x + offset + 'px'
+    if (autoscroll) {
+        $("cursor").scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'center'
+        })
+        // $("cursortop").scrollIntoView({
+        //     behavior: 'smooth',
+        //     block: 'nearest',
+        //     inline: 'center'
+        // })
+    }
     lastDrawPos = x
     requestAnimationFrame(drawActiveTrack)
 }
+
+// Timeline event handlers
+function manualScrollNotify (e) {
+    autoscroll = false
+}
+$('.trackrolls').addEventListener('wheel', manualScrollNotify)
+$('.trackrolls').addEventListener('touchmove', manualScrollNotify)
+$('.trackrolls').addEventListener('mousedown', manualScrollNotify)
 
 
 // temporary hardcoded initialization
 instrument = new Instrument('foo', 'sampled', {C4:"C4.mp3", A4: "A4.mp3", C5: "C5.mp3"})
 active_track = new Track("Piano2", instrument)
-// active_canvas = document.querySelector('canvas.trackroll')
+// active_canvas = $('canvas.trackroll')
 
 drawActiveTrack()
 </script>
