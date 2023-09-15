@@ -234,6 +234,7 @@ class Track {
         canvas.height = 100
         canvas.className = "trackroll"
         this.track.appendChild(canvas)
+        canvas.style.left = Tone.Transport.seconds * xScalingFactor + "px"
         active_canvas = canvas
         this.buffers.push({
             buffer: buf,
@@ -397,7 +398,8 @@ document.querySelector('button.play')?.addEventListener('click', async () => {
 })
 
 function drawActiveTrack() {
-    x = parseInt(Tone.Transport.seconds * xScalingFactor)
+    offset = active_canvas ? parseInt(active_canvas.style.left) : 0
+    x = parseInt(Tone.Transport.seconds * xScalingFactor) - offset
     delta = x-lastDrawPos
     width = Math.max(10, x)
     if(recording) {
@@ -412,7 +414,7 @@ function drawActiveTrack() {
             ctx.fillStyle = "rgba(0,0,0,1)"
             for (let note of active_track.activeBuffer) {
                 pos = notePosition[note[2]] * yScalingFactor // TODO: scaling
-                ctx.fillRect(note[0] * xScalingFactor, pos, note[3]*xScalingFactor||(x-note[0]*xScalingFactor), 4)
+                ctx.fillRect(note[0] * xScalingFactor - offset, pos, note[3]*xScalingFactor||(x-note[0]*xScalingFactor + offset), 4)
             }
         }
         ctx.fillStyle="rgba(200,200,200,1)"
@@ -424,7 +426,11 @@ function drawActiveTrack() {
             ctx.fillRect(lastDrawPos,pos,delta,4)
         }
     }
-    document.querySelector('.cursor').style.left = x + 'px'
+    document.querySelector('.cursor').style.left = x + offset + 'px'
+    document.querySelector(".cursor").scrollIntoView({
+        behavior: 'smooth',
+        inline: 'center'
+    })
     lastDrawPos = x
     requestAnimationFrame(drawActiveTrack)
 }
