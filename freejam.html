@@ -128,18 +128,26 @@ class Instrument {
             })
         }
     }
-    play_note(note) {
+    play_note(note, duration) {
         if (this.type == "synth" || this.type == "polysynth") {
-            this.synth.triggerAttack(note)
-            this.active_key = note
-            if (this.type=="synth") {
-                this.active_notes.clear()
+            if (duration) {
+                this.synth.triggerAttackRelease(note, duration)
+            } else {
+                this.synth.triggerAttack(note)
+                this.active_key = note
+                if (this.type=="synth") {
+                    this.active_notes.clear()
+                }
+                this.active_notes.add(note)
+                console.log(this.active_notes)
             }
-            this.active_notes.add(note)
-            console.log(this.active_notes)
         } else if (this.type == "sampled" && this.loaded) {
-            this.sampler.triggerAttack(note)
-            this.active_notes.add(note)
+            if (duration) {
+                this.sampler.triggerAttackRelease(note, duration)
+            } else {
+                this.sampler.triggerAttack(note)
+                this.active_notes.add(note)
+            }
         }
     }
     release_note(note) {
@@ -164,22 +172,6 @@ class Instrument {
             this.synth.releaseAll()
         } else if (this.type == "sampled") {
             this.sampler.releaseAll()
-        }
-    }
-    sync() {
-        if (this.type == "synth" || this.type == "polysynth") {
-            this.synth.sync()
-        } else if (this.type == "sampled") {
-            console.log("syncing")
-            this.sampler.sync()
-        }
-    }
-    unsync() {
-        if (this.type == "synth" || this.type == "polysynth") {
-            this.synth.unsync()
-        } else if (this.type == "sampled") {
-            console.log("unsyncing")
-            this.sampler.unsync()
         }
     }
 }
@@ -209,38 +201,31 @@ class Track {
     play_note(note) {
         var ref;
         var rec;
+        this.instrument.play_note(note)
         if (recording) {
-            this.instrument.play_note(note)
-            // ref = Tone.Transport.schedule((time) => { this.instrument.play_note(note); }, Tone.Transport.position)
             ref = 1
             rec = [Tone.Transport.seconds, ref, note]
             this.activeBuffer?.push(rec)
             this.active_notes[note] = rec
-        } else {
-            this.instrument.play_note(note)
         }
     }
     release_note(note) {
         var ref;
         if (recording) {
-            // ref = Tone.Transport.schedule((time) => { this.instrument.release_note(note); }, Tone.Transport.position)
             if (note in this.active_notes) {
                 this.active_notes[note][3] = Tone.Transport.seconds - this.active_notes[note][0]
             }
         }
-        // } else {
-            this.instrument.release_note(note)
+        this.instrument.release_note(note)
     }
     release_all() {
         var ref;
         if (recording) {
-            ref = Tone.Transport.schedule((time) => { this.instrument.release_all(); }, Tone.Transport.position)
             for (let note of this.instrument.active_notes) {
-                this.activeBuffer?.push([Tone.Transport.seconds, ref, note, 'release'])
+                this.active_notes[note][3] = Tone.Transport.seconds - this.active_notes[note][0]
             }
-        } else {
-            this.instrument.release_all()
         }
+        this.instrument.release_all()
     }
     startRecording() {
         var buf = []
@@ -256,10 +241,15 @@ class Track {
             canvas: canvas
         })
         this.activeBuffer = buf
-        this.instrument.sync()
     }
     stopRecording() {
-        this.instrument.unsync()
+        if (this.activeBuffer && recording) {
+            var pos = Tone.Transport.position
+            for (let note of this.activeBuffer) {
+                note[1] = Tone.Transport.schedule((time) => { this.instrument.play_note(note[2], note[3])}, note[0])
+            }
+            this.activeBuffer = undefined
+        }
     }
 }
 keysMapLayouts = {
