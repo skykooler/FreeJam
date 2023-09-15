@@ -136,8 +136,14 @@
         </div>
     </div>
 <script>
+// Utilities
+
 // jQuery in 50 bytes, booya
 function $(x) { return document.querySelector(x) }
+// Pollute the global namespace with math functions like Python
+max = Math.max; min = Math.min; abs = Math.abs
+
+DRAGGING_THRESHOLD = 50
 
 tracks = []
 class Instrument {
@@ -231,6 +237,8 @@ class Track {
         this.buffers = []
         this.activeBuffer = undefined
         this.active_notes = {}
+        this.maybedragging = false
+        this.draggingCanvases = []
     }
     play_note(note) {
         var ref;
@@ -267,7 +275,9 @@ class Track {
         canvas.width = 10
         canvas.height = 100
         canvas.className = "trackroll"
-        canvas.draggable = true
+        // canvas.draggable = true
+        canvas.addEventListener("mousedown", this.clickSegment)
+        canvas.parent = this
         this.track.appendChild(canvas)
         canvas.style.left = Tone.Transport.seconds * xScalingFactor + "px"
         active_canvas = canvas
@@ -286,6 +296,20 @@ class Track {
             }
             this.activeBuffer = undefined
         }
+    }
+    clickSegment(event) {
+        // console.log(this)
+        // console.log(this.parent)
+        // console.log(event)
+        this.parent.maybedragging = true
+        this.parent.draggingCanvases = [this]
+        var rect = $('.trackrollwrapper').getBoundingClientRect()
+        var relx = event.x - rect.left
+        var rely = event.y - rect.top
+        this.parent.startx = relx
+        this.offsetx = relx - this.offsetLeft
+        this.offsety = relx - this.offsetTop
+        console.log(`x: ${relx}, y: ${rely}`)
     }
 }
 keysMapLayouts = {
@@ -439,7 +463,7 @@ function drawActiveTrack() {
     offset = active_canvas ? parseInt(active_canvas.style.left) : 0
     x = parseInt(Tone.Transport.seconds * xScalingFactor) - offset
     delta = x-lastDrawPos
-    width = Math.max(10, x)
+    width = max(10, x)
     if(recording) {
         ctx = active_canvas?.getContext("2d")
         if (width > active_canvas.width) {
@@ -464,7 +488,7 @@ function drawActiveTrack() {
             ctx.fillRect(lastDrawPos,pos,delta,4)
         }
     }
-    $('.trackrollwrapper').style.width = Math.max($('.trackrollwrapper').offsetWidth, x + offset + 200) + "px"
+    $('.trackrollwrapper').style.width = max($('.trackrollwrapper').offsetWidth, x + offset + 200) + "px"
     $('cursortop').style.left = x + offset + 'px'
     $('cursor').style.left = x + offset + 'px'
     if (autoscroll) {
@@ -490,6 +514,35 @@ function manualScrollNotify (e) {
 $('.trackrolls').addEventListener('wheel', manualScrollNotify)
 $('.trackrolls').addEventListener('touchmove', manualScrollNotify)
 $('.trackrolls').addEventListener('mousedown', manualScrollNotify)
+
+$('.trackrolls').addEventListener('mousemove', (event) => {
+    var rect = $('.trackrollwrapper').getBoundingClientRect()
+    var relx = event.x - rect.left
+    var rely = event.y - rect.top
+    for (let track of tracks) {
+        if (track.maybedragging) {
+            // console.log()
+            if (abs(track.startx-relx) > DRAGGING_THRESHOLD) {
+                track.dragging = true
+                track.maybedragging = false
+            }
+        }
+        if (track.dragging) {
+            for (let canvas of track.draggingCanvases) {
+                console.log(canvas)
+                canvas.style.left = max(relx-canvas.offsetx,0)+"px"
+            }
+        }
+    }
+})
+$('.trackrolls').addEventListener('mouseup', (event) => {
+    for (let track of tracks) {
+        if (track.dragging) {
+            track.dragging = false
+        }
+        track.maybedragging = false
+    }
+})
 
 
 // temporary hardcoded initialization
