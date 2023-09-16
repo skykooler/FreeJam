@@ -433,6 +433,10 @@ class Track {
         this.offsety = relx - this.offsetTop
         console.log(`x: ${relx}, y: ${rely}`)
     }
+    rename(name) {
+        this.name = name
+        this.trackheader.querySelector('.track_name').innerText = name
+    }
 }
 keysMapLayouts = {
     us: {
@@ -725,6 +729,8 @@ function updateItemList(category) {
     $('ul.items').replaceChildren(...items)
 }
 function selectInstrument(category, item) {
+    active_track.instrument = createInstrument(instruments[category][item])
+    active_track.rename(instruments[category][item].name)
     console.log(`${category}.${item}`)
 }
 
