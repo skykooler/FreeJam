@@ -6,43 +6,64 @@
             padding: 0;
             margin: 0;
         }
+        .sidepanel-open {
+            grid-template-columns: 400px 300px 1fr;
+            display: none;
+        }
+        .sidepanel-closed {
+            grid-template-columns: 0px 300px 1fr;
+            display: none;
+        }
         .main {
             display: grid;
             width: 100%;
             height: 100%;
             position: absolute;
-            grid-template-columns: 1fr;
-            grid-template-rows: 100px 1fr 100px;
+            grid-template-columns: 0px 300px 1fr;
+            grid-template-rows: 100px 30px 1fr 100px; 
             grid-column-gap: 0px;
             grid-row-gap: 0px;
         }
 
         .header {
-            grid-area: 1 / 1 / 2 / 2;
+            grid-area: 1 / 1 / 2 / 4;
             background-color: #aaa;
-        }
-        .tracks {
-            grid-area: 2 / 1 / 3 / 2;
-            overflow-y: auto;
-        }
-        .controls { 
-            grid-area: 3 / 1 / 4 / 2; 
-            background-color: #aaa;
-        }
-        .tracks {
             display: grid;
             grid-template-columns: 300px 1fr;
-            grid-template-rows: 30px 1fr;
+            grid-template-rows: 1fr 30px;
             grid-column-gap: 0px;
             grid-row-gap: 0px;
         }
-        .headersheader {
-            grid-area: 1 / 1 / 2 / 2;
+        /* .tracks {
+            grid-area: 3 / 2 / 4 / 3;
+            overflow-y: auto;
+        } */
+        .controls { 
+            grid-area: 4 / 1 / 5 / 4; 
+            background-color: #aaa;
+        }
+        /* .tracks {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            grid-template-rows: 1fr;
+            grid-column-gap: 0px;
+            grid-row-gap: 0px;
+        } */
+        .tracksheader {
+            grid-area: 2 / 2 / 3 / 3;
             background-color: aquamarine;
         }
+        .rollsheaderwrapper {
+            grid-area: 2 / 3 / 3 / 4;
+            overflow-x: scroll;
+            position: relative;
+            scrollbar-width: none;
+        }
         .rollsheader {
+            /* height: 30px;
+            width: auto; */
             height: 30px;
-            width: auto;
+            min-width: 100%;
             background-color: green;
             position: relative;
         }
@@ -56,12 +77,12 @@
         }
 
         .trackheaders {
-            grid-area: 2 / 1 / 3 / 2;
+            grid-area: 3 / 2 / 4 / 3;
             background-color: cyan;
             position: relative;
         }
         .trackrolls {
-            grid-area: 1 / 2 / 3 / 3;
+            grid-area: 3 / 3 / 4 / 4;
             overflow-x: auto;
             position: relative;
         }
@@ -99,6 +120,8 @@
             height: 100px;
             width: 10px; /* TODO */
             position: absolute;
+            border-radius: 5px;
+            overflow:hidden;
         }
         cursor {
             height: 100%;
@@ -107,32 +130,84 @@
             border-left: 1px solid red;
             z-index: 1;
         }
+        sidepanel {
+            grid-area: 2 / 1 / 4 / 2;
+            background-color: pink;
+            box-sizing: border-box;
+            position: relative;
+            /* padding: 2em; */
+            display: none;
+        }
+        instrumentselector {
+            box-sizing: border-box;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            background-color: #444cf7;
+            display: none;
+        }
+        ul {
+            list-style-type: none;
+        }
+        ul.category {
+            position: absolute;
+            width: 50%;
+            height: 100%;
+            left: 0px;
+            padding: 0px;
+        }
+        ul.items {
+            position: absolute;
+            width: 50%;
+            height:100%;
+            right:0px;
+            padding: 0px;
+        }
+        li:nth-child(odd) {
+            background-color: green;
+        }
     </style>
 <script src="webaudio/tone.js"></script>
 </head>
 <body>
     <div class="main">
-        <div class="header"></div>
-        <div class="tracks">
-            <div class="headersheader"></div>
-            <div class="trackheaders">
-                <button class="newtrackbutton">New track</button>
-            </div>
-            <div class="trackrolls">
-                <div class="trackrollwrapper">
-                    <cursor></cursor>
-                    <div class="rollsheader">
-                        <cursortop></cursortop>
-                    </div>
-                </div>
-
+        <div class="header">
+            <div class="headermain"></div>
+        </div>
+        <div class="tracksheader"></div>
+        <div class="rollsheaderwrapper">
+            <div class="rollsheader">
+                <cursortop></cursortop>
             </div>
         </div>
+        <!-- <div class="tracks"> -->
+        <div class="trackheaders">
+            <button class="newtrackbutton">New track</button>
+        </div>
+        <div class="trackrolls">
+            <div class="trackrollwrapper">
+                <cursor></cursor>
+            </div>
+
+        </div>
+        <!-- </div> -->
+        <sidepanel>
+            <instrumentselector>
+                <ul class="category">
+                </ul>
+                <ul class="items">
+
+                </ul>
+            </instrumentselector>
+        </sidepanel>
         <div class="controls">
             <button class="record">Record</button>
             <button class="play">Play</button>
             <button class="stop">Stop</button>
         </div>
+        <!-- Dummy elements to load CSS values into JS -->
+        <div class="sidepanel-open"></div>
+        <div class="sidepanel-closed"></div>
     </div>
 <script>
 // Utilities
@@ -143,6 +218,39 @@ function $(x) { return document.querySelector(x) }
 max = Math.max; min = Math.min; abs = Math.abs
 
 DRAGGING_THRESHOLD = 50
+
+instruments = {
+    Bass: {},
+    Keyboards: {
+        Piano2: {
+            name: 'Piano2',
+            type: 'sampled',
+            notes: {
+                C1:"C1.mp3", A1: "A1.mp3",
+                C2:"C2.mp3", A2: "A2.mp3",
+                C3:"C3.mp3", A3: "A3.mp3",
+                C4:"C4.mp3", A4: "A4.mp3",
+                C5:"C5.mp3", A5: "A5.mp3",
+                C6:"C6.mp3", A6: "A6.mp3",
+                C7:"C7.mp3", A7: "A7.mp3"}
+        }
+    },
+    Strings: {},
+    Synths: {
+        BasicSynth: {
+            name: 'BasicSynth',
+            type: 'synth'
+        }
+    },
+}
+
+function createInstrument(definition) {
+    if (definition.type == 'sampled') {
+        return new Instrument(definition.name, definition.type, definition.notes)
+    } else if (definition.type == 'synth') {
+        return new Instrument(definition.name, definition.type)
+    }
+}
 
 tracks = []
 class Instrument {
@@ -390,8 +498,10 @@ $('body')?.addEventListener('keydown', async (e) => {
         if ('-+PlayRecordStop'.indexOf(note_base)!=-1) {
             if (note_base=='-' && octave > 1) {
                 octave--;
+                active_track.release_all()
             } else if (note_base=='+' && octave < 7) {
                 octave++;
+                active_track.release_all()
             } else if (note_base == "Play") {
                 playPause()
             } else if (note_base == "Record") {
@@ -478,6 +588,7 @@ $('button.play')?.addEventListener('click', async () => {
 $('button.newtrackbutton')?.addEventListener('click', async () => {
     $('button.newtrackbutton')?.blur()
     new Track("Piano2", instrument).activate()
+    showSidePanel()
 })
 
 function drawActiveTrack() {
@@ -510,6 +621,7 @@ function drawActiveTrack() {
         }
     }
     $('.trackrollwrapper').style.width = max($('.trackrollwrapper').offsetWidth, x + offset + 200) + "px"
+    $('.rollsheader').style.width = $('.trackrollwrapper').offsetWidth + "px"
     $('cursortop').style.left = x + offset + 'px'
     $('cursor').style.left = x + offset + 'px'
     if (autoscroll) {
@@ -518,11 +630,11 @@ function drawActiveTrack() {
             block: 'nearest',
             inline: 'center'
         })
-        // $("cursortop").scrollIntoView({
-        //     behavior: 'smooth',
-        //     block: 'nearest',
-        //     inline: 'center'
-        // })
+        $("cursortop").scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'center'
+        })
     }
     lastDrawPos = x
     requestAnimationFrame(drawActiveTrack)
@@ -531,6 +643,7 @@ function drawActiveTrack() {
 // Timeline event handlers
 function manualScrollNotify (e) {
     autoscroll = false
+    $('.rollsheaderwrapper').scrollTo($('.trackrolls').scrollLeft, 0)
 }
 $('.trackrolls').addEventListener('wheel', manualScrollNotify)
 $('.trackrolls').addEventListener('touchmove', manualScrollNotify)
@@ -579,10 +692,47 @@ $('.trackrolls').addEventListener('mouseup', (event) => {
     }
 })
 
+function showSidePanel() {
+    $('.main').style.gridTemplateColumns = getComputedStyle($('.sidepanel-open')).gridTemplateColumns
+    $('instrumentselector').style.display = "block"
+    $('sidepanel').style.display = "block"
+    updateCategoryList()
+}
+function hideSidePanel() {
+    $('.main').style.gridTemplateColumns = getComputedStyle($('.sidepanel-closed')).gridTemplateColumns
+    $('instrumentselector').style.display = "none"
+    $('sidepanel').style.display = "none"
+}
+function updateCategoryList() {
+    categories = []
+    for (let i in instruments) {
+        cat = document.createElement('li')
+        cat.innerText = i
+        cat.addEventListener('click', (event)=>{updateItemList(i)})
+        categories.push(cat)
+    }
+    $('ul.category').replaceChildren(...categories)
+}
+function updateItemList(category) {
+    console.log(category)
+    items = []
+    for (let i in instruments[category]) {
+        item = document.createElement('li')
+        item.innerText = instruments[category][i].name
+        item.addEventListener('click', (event)=>{selectInstrument(category, i)})
+        items.push(item)
+    }
+    $('ul.items').replaceChildren(...items)
+}
+function selectInstrument(category, item) {
+    console.log(`${category}.${item}`)
+}
 
 // temporary hardcoded initialization
-instrument = new Instrument('foo', 'sampled', {C4:"C4.mp3", A4: "A4.mp3", C5: "C5.mp3"})
+// instrument = new Instrument('foo', 'sampled', {C4:"C4.mp3", A4: "A4.mp3", C5: "C5.mp3"})
+instrument = createInstrument(instruments.Keyboards.Piano2)
 new Track("Piano2", instrument).activate()
+
 
 drawActiveTrack()
 </script>
