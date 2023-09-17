@@ -163,8 +163,14 @@
             right:0px;
             padding: 0px;
         }
+        li {
+            background-color: cyan;
+        }
         li:nth-child(odd) {
             background-color: green;
+        }
+        li.active {
+            background-color: orange;
         }
     </style>
 <script src="webaudio/tone.js"></script>
@@ -219,11 +225,21 @@ max = Math.max; min = Math.min; abs = Math.abs
 
 DRAGGING_THRESHOLD = 50
 
+DEFAULT_CATEGORY = 'Keyboards'
+DEFAULT_ITEM = 'Piano2'
+
 instruments = {
     Bass: {},
     Keyboards: {
+        Piano1: {
+            name: 'Electric Piano',
+            type: 'sampled',
+            notes: {C4:"c.wav"},
+            baseUrl: 'instruments/keyboards/piano1/',
+            release: 1,
+        },
         Piano2: {
-            name: 'Piano2',
+            name: 'Grand Piano',
             type: 'sampled',
             notes: {
                 C1:"C1.mp3", A1: "A1.mp3",
@@ -232,7 +248,9 @@ instruments = {
                 C4:"C4.mp3", A4: "A4.mp3",
                 C5:"C5.mp3", A5: "A5.mp3",
                 C6:"C6.mp3", A6: "A6.mp3",
-                C7:"C7.mp3", A7: "A7.mp3"}
+                C7:"C7.mp3", A7: "A7.mp3"},
+            baseUrl: 'instruments/keyboards/piano2/',
+            release: 0.5,
         }
     },
     Strings: {},
@@ -244,31 +262,24 @@ instruments = {
     },
 }
 
-function createInstrument(definition) {
-    if (definition.type == 'sampled') {
-        return new Instrument(definition.name, definition.type, definition.notes)
-    } else if (definition.type == 'synth') {
-        return new Instrument(definition.name, definition.type)
-    }
-}
-
 tracks = []
 class Instrument {
-    constructor (name, type, samples, filters) {
-        this.name = name
-        this.type = type
+    constructor (definition) {
+        console.log(definition)
+        this.name = definition.name
+        this.type = definition.type
         this.active_key = undefined
         this.active_notes = new Set()
         // Possible types include synth, polysynth, sampled, and recorded
-        if (type=="synth") {
+        if (this.type=="synth") {
             this.synth = new Tone.Synth().toDestination()
-        } else if (type=="polysynth") {
+        } else if (this.type=="polysynth") {
             this.synth = new Tone.PolySynth(Tone.Synth).toDestination()
-        } else if (type=="sampled") {
+        } else if (this.type=="sampled") {
             this.sampler = new Tone.Sampler({
-                urls: samples,
-                release: 1, // TODO: don't hardcode this
-                baseUrl: "instruments/keyboards/piano2/", // TODO: don't hardcode this either
+                urls: definition.notes || {},
+                release: definition.release || 1, // TODO: don't hardcode this
+                baseUrl: definition.baseUrl,
             }).toDestination()
             Tone.loaded().then(() => {
                 this.loaded = true
@@ -593,6 +604,8 @@ $('button.newtrackbutton')?.addEventListener('click', async () => {
     $('button.newtrackbutton')?.blur()
     new Track("Piano2", instrument).activate()
     showSidePanel()
+    updateItemList(DEFAULT_CATEGORY)
+    selectInstrument(DEFAULT_CATEGORY, DEFAULT_ITEM)
 })
 
 function drawActiveTrack() {
@@ -720,6 +733,12 @@ function updateCategoryList() {
 function updateItemList(category) {
     console.log(category)
     items = []
+    for (let itemElement of $('ul.category').querySelectorAll('li')) {
+        itemElement.classList.remove('active')
+        if (itemElement.innerText == category) {
+            itemElement.classList.add('active')
+        }
+    }
     for (let i in instruments[category]) {
         item = document.createElement('li')
         item.innerText = instruments[category][i].name
@@ -728,16 +747,38 @@ function updateItemList(category) {
     }
     $('ul.items').replaceChildren(...items)
 }
+
 function selectInstrument(category, item) {
-    active_track.instrument = createInstrument(instruments[category][item])
+    for (let itemElement of $('ul.category').querySelectorAll('li')) {
+        itemElement.classList.remove('active')
+        if (itemElement.innerText == category) {
+            itemElement.classList.add('active')
+        }
+    }
+    for (let itemElement of $('ul.items').querySelectorAll('li')) {
+        itemElement.classList.remove('active')
+        if (itemElement.innerText == instruments[category][item].name) {
+            itemElement.classList.add('active')
+        }
+    }
+    active_track.release_all()
+    active_track.instrument = new Instrument(instruments[category][item])
     active_track.rename(instruments[category][item].name)
     console.log(`${category}.${item}`)
 }
 
+function exportAudio() {
+    ofcon = new Tone.OfflineContext(2, 10, 44100)
+    Tone.setContext(ofcon)
+    ofcon.render().then(buffer => {
+        console.log(buffer)
+    })
+}
+
 // temporary hardcoded initialization
 // instrument = new Instrument('foo', 'sampled', {C4:"C4.mp3", A4: "A4.mp3", C5: "C5.mp3"})
-instrument = createInstrument(instruments.Keyboards.Piano2)
-new Track("Piano2", instrument).activate()
+instrument = new Instrument(instruments.Keyboards.Piano2)
+new Track('Grand Piano', instrument).activate()
 
 
 drawActiveTrack()
