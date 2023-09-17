@@ -67,6 +67,13 @@
             background-color: green;
             position: relative;
         }
+        .rollsheaderinternalwrapper {
+            min-width: 100%;
+            min-height:100%;
+            position: relative;
+            background-size: 100px;
+            background-image:  repeating-linear-gradient(to right, #44f79e, #44f79e 1px, #e5f7ea 1px, #e5f7ea);
+        }
         cursortop {
             height: 100%;
             width: 10px;
@@ -183,7 +190,9 @@
         <div class="tracksheader"></div>
         <div class="rollsheaderwrapper">
             <div class="rollsheader">
-                <cursortop></cursortop>
+                <div class="rollsheaderinternalwrapper">
+                    <cursortop></cursortop>
+                </div>
             </div>
         </div>
         <!-- <div class="tracks"> -->
@@ -707,6 +716,13 @@ $('.trackrolls').addEventListener('mouseup', (event) => {
         }
         track.maybedragging = false
     }
+})
+$('.rollsheader').addEventListener('click', (event) => {
+    var rect = $('.rollsheaderinternalwrapper').getBoundingClientRect()
+    var relx = event.x - rect.left
+    var rely = event.y - rect.top
+    Tone.Transport.position = relx / xScalingFactor
+    console.log(relx)
 })
 
 function showSidePanel() {
