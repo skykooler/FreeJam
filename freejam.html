@@ -181,6 +181,7 @@
         }
     </style>
 <script src="webaudio/tone.js"></script>
+<script src="webaudio/lame.min.js"></script>
 </head>
 <body>
     <div class="main">
@@ -241,6 +242,8 @@ instruments = {
     Bass: {},
     Keyboards: {
         Piano1: {
+            category: 'Keyboards',
+            item: 'Piano1',
             name: 'Electric Piano',
             type: 'sampled',
             notes: {C4:"c.wav"},
@@ -248,6 +251,8 @@ instruments = {
             release: 1,
         },
         Piano2: {
+            category: 'Keyboards',
+            item: 'Piano2',
             name: 'Grand Piano',
             type: 'sampled',
             notes: {
@@ -265,18 +270,34 @@ instruments = {
     Strings: {},
     Synths: {
         BasicSynth: {
-            name: 'BasicSynth',
+            category: 'Synths',
+            item: 'BasicSynth',
+            name: 'Basic Synth',
             type: 'synth'
         }
     },
 }
 
+live_instruments = {
+    Basic: {
+        NoEffects: {
+            category: 'Basic',
+            item: 'NoEffects',
+            name: 'No Effects',
+            type: 'recorded'
+        }
+    }
+}
+
 tracks = []
 class Instrument {
     constructor (definition) {
-        console.log(definition)
         this.name = definition.name
         this.type = definition.type
+        this.category = definition.category
+        this.item = definition.item
+        this.release = definition.release
+        this.baseUrl = definition.baseUrl
         this.active_key = undefined
         this.active_notes = new Set()
         // Possible types include synth, polysynth, sampled, and recorded
@@ -287,8 +308,34 @@ class Instrument {
         } else if (this.type=="sampled") {
             this.sampler = new Tone.Sampler({
                 urls: definition.notes || {},
-                release: definition.release || 1, // TODO: don't hardcode this
+                release: definition.release || 1,
                 baseUrl: definition.baseUrl,
+            }).toDestination()
+            Tone.loaded().then(() => {
+                this.loaded = true
+            })
+        } else if (this.type=="recorded") {
+            this.mic = new Tone.UserMedia()
+            this.recorder = new Tone.Recorder()
+            this.mic.connect(this.recorder)
+            this.mic.open()
+            this.players = new Tone.Players()
+        }
+    }
+    reforge() {
+        if (this.type=="synth") {
+            this.synth = new Tone.Synth().toDestination()
+        } else if (this.type=="polysynth") {
+            this.synth = new Tone.PolySynth(Tone.Synth).toDestination()
+        } else if (this.type=="sampled") {
+            var samples = {}
+            this.sampler._buffers._buffers.forEach((buf, key) => {
+                samples[key] = buf
+            })
+            this.sampler = new Tone.Sampler(samples,
+            {
+                release: this.release || 1,
+                baseUrl: this.baseUrl,
             }).toDestination()
             Tone.loaded().then(() => {
                 this.loaded = true
@@ -306,9 +353,9 @@ class Instrument {
                     this.active_notes.clear()
                 }
                 this.active_notes.add(note)
-                console.log(this.active_notes)
             }
         } else if (this.type == "sampled" && this.loaded) {
+        // } else if (this.type == "sampled") {
             if (duration) {
                 this.sampler.triggerAttackRelease(note, duration)
             } else {
@@ -340,6 +387,19 @@ class Instrument {
         } else if (this.type == "sampled") {
             this.sampler.releaseAll()
         }
+    }
+    startRecording() {
+        if (this.type="recorded") {
+            this.recorder.start()
+        }
+    }
+    stopRecording(){
+        async function handleStop(self) {
+            var data = await self.recorder.stop()
+            var blobUrl = URL.createObjectURL(data);
+            console.log(blobUrl)
+        }
+        handleStop(this)
     }
 }
 class Track {
@@ -417,6 +477,7 @@ class Track {
         canvas.bufinfo = bufinfo
         this.buffers.push(bufinfo)
         this.activeBuffer = buf
+        this.instrument.startRecording()
     }
     stopRecording() {
         if (this.activeBuffer && recording) {
@@ -426,10 +487,10 @@ class Track {
             }
             this.activeBuffer = undefined
         }
+        this.instrument.stopRecording()
     }
-    schedule(note) {
-        console.log(note)
-        note[1] = Tone.Transport.schedule((time) => { this.instrument.play_note(note[2], note[3])}, note[0])
+    schedule(note, transport=Tone.Transport) {
+        note[1] = transport.schedule((time) => { this.instrument.play_note(note[2], note[3])}, note[0])
     }
     activate() {
         active_track = this
@@ -497,6 +558,7 @@ lastDrawPos = 0
 noteNames = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B']
 xScalingFactor = 100
 yScalingFactor = 100
+songLength=1
 for (let i in noteNames) {
     for (let j of [1,2,3,4,5,6,7,8]) {
         notePosition[noteNames[i]+j] = 1 - (i/24 + j%2/2) - 1/24
@@ -633,7 +695,7 @@ function drawActiveTrack() {
             ctx.fillRect(0,0, width, yScalingFactor)
             ctx.fillStyle = "rgba(0,0,0,1)"
             for (let note of active_track.activeBuffer) {
-                pos = notePosition[note[2]] * yScalingFactor // TODO: scaling
+                pos = notePosition[note[2]] * yScalingFactor 
                 ctx.fillRect(note[0] * xScalingFactor - offset, pos, note[3]*xScalingFactor||(x-note[0]*xScalingFactor + offset), 4)
             }
         }
@@ -642,7 +704,7 @@ function drawActiveTrack() {
         ctx.fillRect(lastDrawPos,0,delta,yScalingFactor)
         ctx.fillStyle = "rgba(0,0,0,1)"
         for (let i of active_track.instrument.active_notes) {
-            pos = notePosition[i] * yScalingFactor // TODO: unhardcode scaling
+            pos = notePosition[i] * yScalingFactor 
             ctx.fillRect(lastDrawPos,pos,delta,4)
         }
     }
@@ -650,6 +712,7 @@ function drawActiveTrack() {
     $('.rollsheader').style.width = $('.trackrollwrapper').offsetWidth + "px"
     $('cursortop').style.left = x + offset + 'px'
     $('cursor').style.left = x + offset + 'px'
+    songLength = $('.trackrollwrapper').offsetWidth / xScalingFactor // TODO: proper song length tracking
     if (autoscroll) {
         $("cursor").scrollIntoView({
             behavior: 'smooth',
@@ -664,6 +727,21 @@ function drawActiveTrack() {
     }
     lastDrawPos = x
     requestAnimationFrame(drawActiveTrack)
+}
+function updateTransport(transport=Tone.Transport) {
+    for (let track of tracks) {
+        scheduled_notes = []
+        for (let i of track.buffers) {
+            canvas = i.canvas
+            for (let note of canvas.bufinfo.buffer) {
+                transport.clear(note[1])
+                scheduled_notes.push(note)
+            }
+        }
+        for (let note of scheduled_notes) {
+            track.schedule(note, transport)
+        }
+    }
 }
 
 // Timeline event handlers
@@ -783,11 +861,141 @@ function selectInstrument(category, item) {
     console.log(`${category}.${item}`)
 }
 
+function audioBufferToWav(aBuffer, AudioFormat="MP3") {
+  let numOfChan = aBuffer.numberOfChannels,
+    btwLength = aBuffer.length * numOfChan * 2 + 44,
+    btwArrBuff = new ArrayBuffer(btwLength),
+    btwView = new DataView(btwArrBuff),
+    btwChnls = [],
+    btwIndex,
+    btwSample,
+    btwOffset = 0,
+    btwPos = 0;
+  setUint32(0x46464952); // "RIFF"
+  setUint32(btwLength - 8); // file length - 8
+  setUint32(0x45564157); // "WAVE"
+  setUint32(0x20746d66); // "fmt " chunk
+  setUint32(16); // length = 16
+  setUint16(1); // PCM (uncompressed)
+  setUint16(numOfChan);
+  setUint32(aBuffer.sampleRate);
+  setUint32(aBuffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
+  setUint16(numOfChan * 2); // block-align
+  setUint16(16); // 16-bit
+  setUint32(0x61746164); // "data" - chunk
+  setUint32(btwLength - btwPos - 4); // chunk length
+
+  for (btwIndex = 0; btwIndex < aBuffer.numberOfChannels; btwIndex++)
+    btwChnls.push(aBuffer.getChannelData(btwIndex));
+
+  while (btwPos < btwLength) {
+    for (btwIndex = 0; btwIndex < numOfChan; btwIndex++) {
+      // interleave btwChnls
+      btwSample = Math.max(-1, Math.min(1, btwChnls[btwIndex][btwOffset])); // clamp
+      btwSample =
+        (0.5 + btwSample < 0 ? btwSample * 32768 : btwSample * 32767) | 0; // scale to 16-bit signed int
+      btwView.setInt16(btwPos, btwSample, true); // write 16-bit sample
+      btwPos += 2;
+    }
+    btwOffset++; // next source sample
+  }
+
+  let wavHdr = lamejs.WavHeader.readHeader(new DataView(btwArrBuff));
+
+  //Stereo
+  let data = new Int16Array(btwArrBuff, wavHdr.dataOffset, wavHdr.dataLen / 2);
+  let leftData = [];
+  let rightData = [];
+  for (let i = 0; i < data.length; i += 2) {
+    leftData.push(data[i]);
+    rightData.push(data[i + 1]);
+  }
+  var left = new Int16Array(leftData);
+  var right = new Int16Array(rightData);
+
+  if (AudioFormat === "MP3") {
+    //STEREO
+    return wavToMp3(wavHdr.channels, wavHdr.sampleRate, left, right);
+  } else return new Blob([btwArrBuff], { type: "audio/wav" });
+
+  function setUint16(data) {
+    btwView.setUint16(btwPos, data, true);
+    btwPos += 2;
+  }
+
+  function setUint32(data) {
+    btwView.setUint32(btwPos, data, true);
+    btwPos += 4;
+  }
+}
+
+function wavToMp3(channels, sampleRate, left, right = null) {
+  var buffer = [];
+  var mp3enc = new lamejs.Mp3Encoder(channels, sampleRate, 128);
+  var remaining = left.length;
+  var samplesPerFrame = 1152;
+
+  for (var i = 0; remaining >= samplesPerFrame; i += samplesPerFrame) {
+    if (!right) {
+      var mono = left.subarray(i, i + samplesPerFrame);
+      var mp3buf = mp3enc.encodeBuffer(mono);
+    } else {
+      var leftChunk = left.subarray(i, i + samplesPerFrame);
+      var rightChunk = right.subarray(i, i + samplesPerFrame);
+      var mp3buf = mp3enc.encodeBuffer(leftChunk, rightChunk);
+    }
+    if (mp3buf.length > 0) {
+      buffer.push(mp3buf); //new Int8Array(mp3buf));
+    }
+    remaining -= samplesPerFrame;
+  }
+  var d = mp3enc.flush();
+  if (d.length > 0) {
+    buffer.push(new Int8Array(d));
+  }
+
+  var mp3Blob = new Blob(buffer, { type: "audio/mp3" });
+  //var bUrl = window.URL.createObjectURL(mp3Blob);
+
+  // send the download link to the console
+  //console.log('mp3 download:', bUrl);
+  return mp3Blob;
+}
+
+function saveAs(content, fileName) {
+  const a = document.createElement("a");
+  const isBlob = content.toString().indexOf("Blob") > -1;
+  let url = content;
+  if (isBlob) {
+    url = window.URL.createObjectURL(content);
+  }
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  if (isBlob) {
+    window.URL.revokeObjectURL(url);
+  }
+}
+
 function exportAudio() {
-    ofcon = new Tone.OfflineContext(2, 10, 44100)
-    Tone.setContext(ofcon)
-    ofcon.render().then(buffer => {
-        console.log(buffer)
+    // ofcon = new Tone.OfflineContext(2, 10, 44100)
+    // Tone.setContext(ofcon)
+    // ofcon.render().then(buffer => {
+    //     console.log(buffer)
+    // })
+    Tone.Transport.stop()
+    Tone.Offline(({transport})=>{
+        for (track of tracks) {
+            // track.instrument = new Instrument(instruments[track.instrument.category][track.instrument.item])
+            track.instrument.reforge()
+        }
+        updateTransport(transport)
+        transport.start()
+    }, songLength).then((buffer) => {
+        wav = audioBufferToWav(buffer)
+        saveAs(wav, "output.mp3")
+
+        for (track of tracks) { track.instrument.reforge(); }
     })
 }
 
