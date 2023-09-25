@@ -320,6 +320,7 @@ class Instrument {
             this.mic.connect(this.recorder)
             this.mic.open()
             this.players = new Tone.Players()
+            this.record_start_time = 0
         }
     }
     reforge() {
@@ -389,15 +390,20 @@ class Instrument {
         }
     }
     startRecording() {
-        if (this.type="recorded") {
+        if (this.type=="recorded") {
             this.recorder.start()
+            this.record_start_time = Tone.Transport.seconds
+            this.recording_id = `${Math.random()}`
         }
     }
     stopRecording(){
         async function handleStop(self) {
-            var data = await self.recorder.stop()
-            var blobUrl = URL.createObjectURL(data);
-            console.log(blobUrl)
+            if (self.type=="recorded") {
+                var data = await self.recorder.stop()
+                var blobUrl = URL.createObjectURL(data);
+                console.log(blobUrl)
+                self.players.add(self.recording_id, data)
+            }
         }
         handleStop(this)
     }
