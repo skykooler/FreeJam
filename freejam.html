@@ -195,6 +195,8 @@
     </style>
 <script src="webaudio/tone.js"></script>
 <script src="webaudio/lame.min.js"></script>
+<script src="webaudio/JZZ.js"></script>
+<script src="webaudio/JZZ.midi.SMF.js"></script>
 </head>
 <body>
     <div class="main">
@@ -251,6 +253,8 @@ DRAGGING_THRESHOLD = 50
 DEFAULT_CATEGORY = 'Keyboards'
 DEFAULT_ITEM = 'Piano2'
 
+smf = new JZZ.MIDI.SMF(0,96)
+
 instruments = {
     Bass: {},
     Keyboards: {
@@ -300,6 +304,14 @@ live_instruments = {
             type: 'recorded'
         }
     }
+}
+
+function midiToSeconds(beats, track=undefined) {
+    return beats/96.0; // TODO make this reactive
+}
+
+function secondsToMidi(beats, track=undefined) {
+    return Math.round(beats*96); // TODO make this reactive
 }
 
 tracks = []
@@ -443,26 +455,38 @@ class Track {
         tracks.push(this)
         this.buffers = []
         this.activeBuffer = undefined
+
+        this.activeSeq = undefined
         this.active_notes = {}
         this.maybedragging = false
         this.draggingCanvases = []
+
+        this.midi_track = new JZZ.MIDI.SMF.MTrk()
+        this.midi_track.add(0, JZZ.MIDI.smfSeqName(name))
+        smf.push(this.midi_track)
     }
     play_note(note) {
         var ref;
         var rec;
+        var channel = 0;
+        var velocity = 127;
         this.instrument.play_note(note)
         if (recording) {
             ref = 1
             rec = [Tone.Transport.seconds, ref, note]
-            this.activeBuffer?.push(rec)
+            // this.activeBuffer?.push(rec)
+            // note_on = JZZ.MIDI.noteOn(channel, note, velocity)
+            this.midi_track.add(secondsToMidi(Tone.Transport.seconds), JZZ.MIDI.noteOn(channel, note, velocity))
             this.active_notes[note] = rec
         }
     }
     release_note(note) {
         var ref;
+        var channel = 0;
         if (recording) {
             if (note in this.active_notes) {
-                this.active_notes[note][3] = Tone.Transport.seconds - this.active_notes[note][0]
+                // this.active_notes[note][3] = Tone.Transport.seconds - this.active_notes[note][0]
+                this.midi_track.add(secondsToMidi(Tone.Transport.seconds), JZZ.MIDI.noteOff(channel, note))
             }
         }
         this.instrument.release_note(note)
@@ -489,10 +513,12 @@ class Track {
         canvas.style.left = Tone.Transport.seconds * xScalingFactor + "px"
         active_canvas = canvas
         let bufinfo = {
-            buffer: buf,
-            start: Tone.Transport.seconds,
+            // buffer: buf,
+            // start: Tone.Transport.seconds,
+            start: secondsToMidi(Tone.Transport.seconds),
             canvas: canvas
         }
+        this.midi_track.add(secondsToMidi(Tone.Transport.seconds), JZZ.MIDI.smfMarker('start:'+this.name))
         canvas.bufinfo = bufinfo
         this.buffers.push(bufinfo)
         this.activeBuffer = buf
@@ -500,11 +526,13 @@ class Track {
     }
     stopRecording() {
         if (this.activeBuffer && recording) {
-            var pos = Tone.Transport.position
-            for (let note of this.activeBuffer) {
-                this.schedule(note)
-            }
-            this.activeBuffer = undefined
+            // var pos = Tone.Transport.position
+            // for (let note of this.activeBuffer) {
+            //     this.schedule(note)
+            // }
+            this.midi_track.add(secondsToMidi(Tone.Transport.seconds), JZZ.MIDI.smfMarker('end:'))
+            // this.midi_track.add(secondsToMidi(Tone.Transport.seconds), JZZ.MIDI.smfEndOfTrack())
+            this.activeSeq = undefined
         }
         this.instrument.stopRecording()
     }
@@ -578,9 +606,11 @@ noteNames = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B']
 xScalingFactor = 100
 yScalingFactor = 100
 songLength=1
-for (let i in noteNames) {
+// for (let i in noteNames) {
+for (let i of [0,1,2,3,4,5,6,7,8,9,10,11]) {
     for (let j of [1,2,3,4,5,6,7,8]) {
-        notePosition[noteNames[i]+j] = 1 - (i/24 + j%2/2) - 1/24
+        // notePosition[noteNames[i]+j] = 1 - (i/24 + j%2/2) - 1/24
+        notePosition[i+(j*12)] = 1 - (i/24 + j%2/2) - 1/24
     }
 }
 
@@ -713,10 +743,23 @@ function drawActiveTrack() {
             ctx.lineStyle="none"
             ctx.fillRect(0,0, width, yScalingFactor)
             ctx.fillStyle = "rgba(0,0,0,1)"
-            for (let note of active_track.activeBuffer) {
+            notes = new Array(127)
+            for (var i=0; i<active_track.midi_track.length; i++) {
+                evt = active_track.midi_track[i];
+                if (evt.tt < active_canvas.bufinfo.start) { continue; };
+                if (evt.isNoteOn()) {
+                    notes[evt.getNote()] = evt.tt;
+                } else if (evt.isNoteOff() && notes[evt.getNote()]) {
+                    pos = notePosition[evt.getNote()] * yScalingFactor;
+                    console.log(midiToSeconds(notes[evt.getNote()]) * xScalingFactor - offset, pos, midiToSeconds(evt.tt - notes[evt.getNote()]) * xScalingFactor, 4)
+                    ctx.fillRect(midiToSeconds(notes[evt.getNote()]) * xScalingFactor - offset, pos, midiToSeconds(evt.tt - notes[evt.getNote()]) * xScalingFactor, 4)
+                }
+            }
+            /*for (let note of active_track.activeBuffer) {
                 pos = notePosition[note[2]] * yScalingFactor 
                 ctx.fillRect(note[0] * xScalingFactor - offset, pos, note[3]*xScalingFactor||(x-note[0]*xScalingFactor + offset), 4)
-            }
+            }*/
+
         }
         ctx.fillStyle="rgba(200,200,200,1)"
         ctx.lineStyle="none"
