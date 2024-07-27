@@ -314,6 +314,20 @@ function secondsToMidi(beats, track=undefined) {
     return Math.round(beats*96); // TODO make this reactive
 }
 
+function midiToPitch(midi) {
+	const octave = Math.floor(midi / 12);
+	return midiToPitchClass(midi) + octave.toString();
+}
+
+/**
+ * Convert a MIDI note to a pitch class (just the pitch no octave).
+ */
+function midiToPitchClass(midi) {
+	const scaleIndexToNote = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+	const note = midi % 12;
+	return scaleIndexToNote[note];
+}
+
 tracks = []
 class Instrument {
     constructor (definition) {
@@ -476,6 +490,7 @@ class Track {
             rec = [Tone.Transport.seconds, ref, note]
             // this.activeBuffer?.push(rec)
             // note_on = JZZ.MIDI.noteOn(channel, note, velocity)
+            console.log(note)
             this.midi_track.add(secondsToMidi(Tone.Transport.seconds), JZZ.MIDI.noteOn(channel, note, velocity))
             this.active_notes[note] = rec
         }
@@ -682,6 +697,17 @@ function playPause() {
         recording = false
         $('button.play').innerText = "Play"
     } else {
+        if (Tone.Transport.state == 'stopped') {
+            for (let track of tracks) {
+                for (let evt of track.midi_track) {
+                    if (evt.isNoteOn()) {
+                        Tone.Transport.schedule((time) => { track.instrument.play_note(midiToPitch(evt.getNote()))}, midiToSeconds(evt.tt))
+                    } else if (evt.isNoteOff()) {
+                        Tone.Transport.schedule((time) => { track.instrument.release_note(midiToPitch(evt.getNote()))}, midiToSeconds(evt.tt))
+                    }
+                }
+            }
+        }
         Tone.Transport.start()
         $('button.play').innerText = "Pause"
         autoscroll = true
@@ -692,6 +718,7 @@ function stop() {
     active_track.stopRecording()
     recording = false
     Tone.Transport.stop()
+    Tone.Transport.clear()
     lastDrawPos = 0
     $('button.play').innerText = "Play"
 }
