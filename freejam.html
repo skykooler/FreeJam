@@ -306,12 +306,14 @@ live_instruments = {
     }
 }
 
+ppqn = 96.0
+
 function midiToSeconds(beats, track=undefined) {
-    return beats/96.0; // TODO make this reactive
+    return beats/ppqn; // TODO make this reactive
 }
 
 function secondsToMidi(beats, track=undefined) {
-    return Math.round(beats*96); // TODO make this reactive
+    return Math.round(beats*ppqn); // TODO make this reactive
 }
 
 function midiToPitch(midi) {
@@ -633,6 +635,7 @@ for (let i of [0,1,2,3,4,5,6,7,8,9,10,11]) {
 $('body')?.addEventListener('click', async () => {
     if (Tone.context.state === "suspended") {
         await Tone.start()
+        Tone.context.lookAhead = 0;
     }
 })
 
@@ -640,7 +643,9 @@ $('body')?.addEventListener('click', async () => {
 $('body')?.addEventListener('keydown', async (e) => {
     if (Tone.context.state === "suspended") {
         await Tone.start()
+        Tone.context.lookAhead = 0;
     }
+    // if (Tone.context.lookahead) Tone.context.lookahead
     if (active_keys.has(e.code)) return;
     active_keys.add(e.code)
     note_base = keysMap[e.code]
@@ -1093,10 +1098,50 @@ function exportAudio() {
     })
 }
 
+///////////////// HACK ///////////////////////////////////////
+function fromFile() {
+  let input = document.createElement('input');
+  input.type = 'file';
+  input.onchange = _ => {
+    // you can use this method to get file and perform respective operations
+            let files =   Array.from(input.files);
+            console.log(files);
+            var reader = new FileReader();
+            var f = input.files[0];
+            reader.onload = function(e) {
+                var data = '';
+                var bytes = new Uint8Array(e.target.result);
+                for (var i = 0; i < bytes.length; i++) {
+                    data += String.fromCharCode(bytes[i]);
+                }
+                console.log([data]);
+                midi = JZZ.MIDI.SMF(data)
+                ppqn = midi.ppqn
+                for (let track of midi) {
+                    for (let evt of track) {
+                        if (evt.isSeqName) {
+                            freejamtrack = new Track(evt.dd, instrument)
+                            freejamtrack.activate()
+                            freejamtrack.midi_track = track
+                            break;
+                        }
+                    }
+                }
+            };
+            reader.readAsArrayBuffer(f);
+
+        };
+  input.click();
+  document.body.removeEventListener('click', fromFile)
+}
+document.body.addEventListener('click', fromFile)
+/////////////////////////////////////////////////////////////
+
 // temporary hardcoded initialization
 // instrument = new Instrument('foo', 'sampled', {C4:"C4.mp3", A4: "A4.mp3", C5: "C5.mp3"})
 instrument = new Instrument(instruments.Keyboards.Piano2)
 new Track('Grand Piano', instrument).activate()
+
 
 
 drawActiveTrack()
